@@ -1091,7 +1091,24 @@ async function runShared() {
 /* 主畫面 App 用:讀剪貼簿(捷徑複製的網址或一般連結) */
 async function pasteShared() {
   let t = '';
-  try { t = await navigator.clipboard.readText(); } catch (e) { toast('沒有讀到剪貼簿,請再按一次並點「貼上」'); return; }
+  /* 捷徑拷貝的是「網址」格式,readText 讀不到,所以先用 read() 找文字或網址 */
+  try {
+    if (navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        for (const ty of ['text/plain', 'text/uri-list', 'text/html']) {
+          if (!it.types.includes(ty)) continue;
+          let v = await (await it.getType(ty)).text();
+          if (ty === 'text/html') v = (v.match(/https?:\/\/[^"'<\s]+/) || [''])[0].replace(/&amp;/g, '&');
+          if (ty === 'text/uri-list') v = v.split(/\r?\n/).filter(x => x && !x.startsWith('#'))[0] || '';
+          if (v && v.trim()) { t = v; break; }
+        }
+        if (t) break;
+      }
+    } else t = await navigator.clipboard.readText();
+  } catch (e) {
+    try { t = await navigator.clipboard.readText(); } catch (e2) { toast('沒有讀到剪貼簿,請再按一次並點「貼上」'); return; }
+  }
   t = (t || '').trim(); if (!t) { toast('剪貼簿是空的'); return; }
   const m = t.match(/coffee-who\.github\.io\/Collect\/?(\?\S*)/i);
   if (m) { if (incoming(m[1])) await runShared(); else toast('剪貼簿裡沒有連結'); return; }
