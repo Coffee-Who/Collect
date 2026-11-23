@@ -1069,6 +1069,20 @@ function cleanShared(t) {
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
 }
+function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
+function captionFromHtml(h) {
+  const metas = h.match(/<meta\b[^>]*>/gi) || [];
+  const attr = (tag, n) => { const m = tag.match(new RegExp(n + '\\s*=\\s*"([^"]*)"', 'i')) || tag.match(new RegExp(n + "\\s*=\\s*'([^']*)'", 'i')); return m ? m[1] : ''; };
+  for (const key of ['og:description', 'twitter:description', 'description']) {
+    const tag = metas.find(m => (attr(m, 'property') || attr(m, 'name')).toLowerCase() === key);
+    if (tag && attr(tag, 'content')) return decodeHtml(attr(tag, 'content'));
+  }
+  const j = h.match(/"caption"\s*:\s*\{[^{}]*?"text"\s*:\s*("(?:[^"\\]|\\.)*")/) || h.match(/"edge_media_to_caption"[\s\S]*?"text"\s*:\s*("(?:[^"\\]|\\.)*")/);
+  if (j) { try { return JSON.parse(j[1]); } catch (e) {} }
+  const c = h.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments/);
+  if (c) return decodeHtml(c[1].replace(/<br\s*\/?>/gi, '\n').replace(/<a[^>]*class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/, '').replace(/<[^>]+>/g, '')).trim();
+  return '';
+}
 function incoming(search) {
   const p = new URLSearchParams(search == null ? location.search : search);
   let pu = p.get('url') || '', pt = p.get('text') || '';
@@ -1110,6 +1124,15 @@ async function pasteShared() {
     try { t = await navigator.clipboard.readText(); } catch (e2) { toast('沒有讀到剪貼簿,請再按一次並點「貼上」'); return; }
   }
   t = (t || '').trim(); if (!t) { toast('剪貼簿是空的'); return; }
+  /* 捷徑把「連結 + 整個網頁」拷貝過來:從網頁裡找貼文說明 */
+  if (/<(meta|html|!doctype)/i.test(t)) {
+    const u = firstUrl(t.split('<')[0]) || firstUrl(t) || '';
+    const cap = captionFromHtml(t);
+    if (!cap) { const ti = (t.match(/<title[^>]*>([^<]*)/i) || [, ''])[1].trim(); toast('IG 沒有給貼文內容' + (ti ? '(拿到的是「' + ti.slice(0, 20) + '」頁)' : '') + ',先只存連結'); }
+    if (!u) { toast('剪貼簿裡沒有連結'); return; }
+    S.autoSave = true; S.add = { url: normalizeUrl(u), caption: cleanShared(cap || ''), images: [] }; S.view = 'add';
+    await runShared(); return;
+  }
   const m = t.match(/coffee-who\.github\.io\/Collect\/?(\?\S*)/i);
   if (m) { if (incoming(m[1])) await runShared(); else toast('剪貼簿裡沒有連結'); return; }
   const u = firstUrl(t); if (!u) { toast('剪貼簿裡沒有連結'); return; }
