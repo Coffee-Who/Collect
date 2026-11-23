@@ -190,13 +190,24 @@ function summarize(t) {
   const parts = t.replace(/#\S+/g, '').split(/[。!!??\n]/).map(s => s.trim()).filter(s => s.length > 6);
   return parts.slice(0, 3).join('。') + (parts.length ? '。' : '');
 }
+function guessCat() {
+  const recent = ITEMS.filter(i => !i.sample).sort((a, b) => b.at - a.at).slice(0, 20); const n = {};
+  recent.forEach(i => { n[i.cat] = (n[i.cat] || 0) + 1; });
+  const top = Object.keys(n).sort((a, b) => n[b] - n[a]).map(cat).find(Boolean);
+  return top ? Object.assign(Object.create(top), top, { recent: true }) : (cat('food') || CATS[0]);
+}
 function analyze(input) {
   const text = [input.caption, input.ocr].filter(Boolean).join('\n').trim();
   const d = { id: null, url: input.url, platform: platformOf(input.url), kind: kindOf(input.url), images: input.images || [],
     cat: null, values: {}, note: '', state: 'ok', why: '', at: Date.now() };
-  if (!text) { d.state = 'empty'; return d; }
-  const r = classify(text);
-  if (!r.c || r.score === 0) { d.state = 'unsure'; d.note = summarize(text); return d; }
+  const r = text ? classify(text) : { c: null, score: 0, hit: [] };
+  if (!r.c || r.score === 0) {
+    /* 沒有線索:先放進最常用的分類,不對再改 */
+    const g = guessCat(); d.cat = g.id; d.state = 'guess'; d.note = text ? summarize(text) : '';
+    const sf = g.fields.find(f => f.id === 'status'); if (sf) d.values.status = sf.options[0];
+    d.why = (text ? '說明裡沒有明顯的分類線索' : '連結本身沒有文字可以判斷') + ',先放進「' + g.name + '」' + (g.recent ? '(你最近最常存的)' : '') + ',不對按「改分類」。';
+    return d;
+  }
   const c = r.c; d.cat = c.id;
   if (r.score < 2 && SET.askWhenUnsure) d.state = 'unsure';
   const filled = [];
@@ -706,6 +717,7 @@ function vConfirm() {
   const d = S.draft; const c = d.cat ? cat(d.cat) : null; const img = firstImg(d);
   let banner = '';
   if (d.state === 'empty') banner = `<div class="banner warn"><b style="font-size:14px">還沒有內容可以判斷</b><span class="why">連結已保留。選一個分類、自己寫重點;或回上一步貼說明、加截圖。</span><div class="row"><button class="b2" data-a="sheetcat">選分類</button></div></div>`;
+  else if (d.state === 'guess') banner = `<div class="banner" style="flex-direction:row;align-items:center;justify-content:space-between;gap:10px"><span style="font-size:14px;min-width:0">先放進 <b>${esc(c ? c.name : '')}</b><span class="why" style="display:block">${esc(d.why)}</span></span><button class="b2" style="flex:none;width:auto;padding:0 14px;height:36px" data-a="sheetcat">改分類</button></div>`;
   else if (d.state === 'unsure') banner = `<div class="banner warn"><span style="font-size:14px">系統沒把握${c ? `,猜是 <b>${esc(c.name)}</b>` : ''}</span><span class="why">${esc(d.why || '說明裡沒有明顯的分類線索')}</span><div class="row">${c ? '<button class="b1" data-a="okcat">就是這類</button>' : ''}<button class="b2" data-a="sheetcat">${c ? '改分類' : '選分類'}</button></div></div>`;
   else if (d.state === 'ok') banner = `<div class="banner"><span style="font-size:14px">系統判斷:<b>${esc(c.name)}</b></span><span class="why">${esc(d.why)}</span><div class="row"><button class="b1" data-a="okcat">分類正確</button><button class="b2" data-a="sheetcat">改分類</button></div></div>`;
   else if (c) banner = `<div class="banner" style="flex-direction:row;align-items:center;justify-content:space-between"><span style="font-size:14px">分類:<b>${esc(c.name)}</b></span><button class="b2" style="flex:none;width:auto;padding:0 14px;height:36px" data-a="sheetcat">改分類</button></div>`;
@@ -1051,16 +1063,19 @@ function incoming() {
   await store.open();
   CATS = (await store.getMeta('cats')) || defaultCats();
   const food = CATS.find(c => c.id === 'food'); const kf = food && food.fields.find(f => f.id === 'kind'); if (kf && !kf.options.includes('泰式')) kf.options.push('泰式');
-  SET = Object.assign({ askWhenUnsure: true, keyMode: 'builtin', ownKey: '', gcap: 150, gphoto: true }, (await store.getMeta('settings')) || {});
+  SET = Object.assign({ askWhenUnsure: false, keyMode: 'builtin', ownKey: '', gcap: 150, gphoto: true }, (await store.getMeta('settings')) || {});
+  if (!SET.autoCatV) { SET.askWhenUnsure = false; SET.autoCatV = 1; await saveSet(); }
   GU = (await store.getMeta('gusage')) || null;
   ITEMS = await store.allItems();
   BK.last = (await store.getMeta('lastBackupAt')) || 0; BK.since = (await store.getMeta('savedSinceBackup')) || 0; BK.snooze = (await store.getMeta('backupSnooze')) || 0;
   if (!(await store.getMeta('samplesLoaded')) && !ITEMS.some(i => i.sample)) { try { await loadSamples(); } catch (e) {} }
   incoming();
+  const fromShare = S.view === 'add' && S.add && !S.add.images.length;
   window.__clipbox = { analyze, normalizeUrl, firstUrl, embedUrl, setCats: c => { CATS = c; } };
   await applySampleGeo();
   render();
   setTimeout(geoQueue, 1500);
+  if (fromShare) act('analyze', {});
   if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(() => {}); }
 })();
 })();
