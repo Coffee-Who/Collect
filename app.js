@@ -303,8 +303,15 @@ async function ensurePos() {
 }
 
 /* ---------- Google Maps JavaScript 載入 ---------- */
-let mapsPromise = null;
+let mapsPromise = null, mapsAuthFail = false;
+/* 金鑰被 Google 拒絕(網址限制不符、沒開 API、沒開帳單)時改用簡易地圖 */
+window.gm_authFailure = () => {
+  mapsAuthFail = true;
+  toast('Google 地圖金鑰被拒絕,先改用簡易地圖');
+  if (S.view === 'map') { const el = document.getElementById('gmap'); if (el) { el.innerHTML = ''; simpleMap(el, mapItems()); const src = document.getElementById('mapsrc'); if (src) src.textContent = '簡易地圖(Google 金鑰被拒絕,請檢查網址限制)'; } }
+};
 function ensureMaps() {
+  if (mapsAuthFail) return Promise.resolve(false);
   if (window.google && window.google.maps && window.google.maps.Map) return Promise.resolve(true);
   const key = gKey(); if (!key) return Promise.resolve(false);
   if (mapsPromise) return mapsPromise;
