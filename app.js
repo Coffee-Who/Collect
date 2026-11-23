@@ -1078,6 +1078,7 @@ async function importFile(f) {
 function cleanShared(t) {
   if (!t) return '';
   const ta = document.createElement('textarea'); ta.innerHTML = t; t = ta.value;
+  t = t.replace(/^\s*[a-z0-9._]{3,30}\s+(?=[^\x00-\x7f])/im, ''); /* 開頭的 IG 帳號名 */
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
 }
@@ -1148,15 +1149,20 @@ async function pasteShared() {
   }
   const m = t.match(/coffee-who\.github\.io\/Collect\/?(\?\S*)/i);
   if (m) { if (incoming(m[1])) await runShared(); else toast('剪貼簿裡沒有連結'); return; }
-  const u = firstUrl(t); if (!u) { toast('剪貼簿裡沒有連結'); return; }
-  if (t.length < 400) setTimeout(() => toast('剪貼簿只有連結(' + t.length + ' 字),沒有網頁內容'), 600);
-  else {
-    /* 捷徑給的是網頁「轉成文字」的版本:去掉 IG 介面字,剩下當說明 */
-    const chrome = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|讚|則留言|分享|收藏|追蹤|Follow|•|·|©.*Meta.*|.*from Meta)$/i;
-    const body = t.replace(u, '').split(/[\n。]/).map(x => x.trim()).filter(x => x && !chrome.test(x)).join('\n');
-    if (body.replace(/\s/g, '').length < 15 || /Afrikaans|Meta 驗證|Meta Verified|Čeština|Deutsch.*Español/.test(body)) { setTimeout(() => toast('IG 只回了登入頁,沒有貼文內容,先只存連結'), 600); S.autoSave = true; S.add = { url: normalizeUrl(u), caption: '', images: [] }; S.view = 'add'; await runShared(); return; }
+  const u = firstUrl(t);
+  if (!u) {
+    /* 只有文字(例如捷徑截圖辨識出來的):沒有連結也照樣存 */
+    if (t.replace(/\s/g, '').length < 10) { toast('剪貼簿裡沒有連結或文字'); return; }
+    S.autoSave = true; S.add = { url: '', caption: t, images: [] }; S.view = 'add'; await runShared(); return;
+  }
+  /* 連結以外的文字:可能是捷徑截圖辨識的字,或網頁轉成的文字。去掉 IG 介面字,剩下當說明 */
+  const chrome = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|更多|讚|則留言|分享|收藏|追蹤|追蹤中|Follow|Following|原始音訊|•|·|[\d:：]{3,5}|[\d,.\s萬KkMm]+|©.*Meta.*|.*from Meta)$/i;
+  const body = t.replace(u, '').split(/[\n。]/).map(x => x.trim()).filter(x => x && !chrome.test(x)).join('\n');
+  const loginPage = /Afrikaans|Meta 驗證|Meta Verified|Čeština|Deutsch.*Español/.test(body);
+  if (body.replace(/\s/g, '').length >= 15 && !loginPage) {
     S.autoSave = true; S.add = { url: normalizeUrl(u), caption: cleanShared(body), images: [] }; S.view = 'add'; await runShared(); return;
   }
+  if (loginPage) { setTimeout(() => toast('IG 只回了登入頁,沒有貼文內容,先只存連結'), 600); S.autoSave = true; S.add = { url: normalizeUrl(u), caption: '', images: [] }; S.view = 'add'; await runShared(); return; }
   S.autoSave = false; S.add = { url: u, caption: t.replace(u, '').trim(), images: [] }; await act('analyze', {});
 }
 
