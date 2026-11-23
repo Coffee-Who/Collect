@@ -1060,9 +1060,16 @@ async function importFile(f) {
 }
 
 /* ---------- 從分享或捷徑帶進來(?url= / ?text= / ?title=) ---------- */
+/* 捷徑抓來的 IG 說明(og:description):解開 HTML 編碼、去掉「N 個讚 - 帳號 於 日期:」前綴 */
+function cleanShared(t) {
+  if (!t) return '';
+  const ta = document.createElement('textarea'); ta.innerHTML = t; t = ta.value;
+  t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
+  return t.trim();
+}
 function incoming() {
   const p = new URLSearchParams(location.search);
-  const text = [p.get('title'), p.get('text')].filter(Boolean).join('\n');
+  const text = cleanShared([p.get('title'), p.get('text')].filter(Boolean).join('\n'));
   const url = p.get('url') || firstUrl(text);
   if (!url && !text) return;
   S.autoSave = p.get('auto') === '1';
