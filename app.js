@@ -709,6 +709,7 @@ function vDetail() {
     <div class="dhero">${visualHTML(it, true)}
       <button class="fbtn l" data-a="back" aria-label="返回">${I.back}</button>
       <button class="fbtn r" data-a="menu" data-id="${it.id}" aria-label="更多選項">${I.more}</button>
+      ${it.url && embedUrl(it.url) && !coverImg(it) ? `<a class="hero-tap" href="${esc(it.url)}" target="_blank" rel="noopener" aria-label="在 ${esc(it.platform || '原貼文')} 播放"><span>▶ 在 ${esc(it.platform || '原貼文')} 播放</span></a>` : ''}
       ${it.url ? `<a class="hero-open" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.platform || '原貼文')} ↗</a>` : ''}</div>
     <div class="dbar">
       <div class="row" style="gap:2px">
