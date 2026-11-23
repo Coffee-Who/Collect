@@ -262,9 +262,21 @@ function titleOf(it) { return (it.values && it.values.name) || (it.note ? it.not
 function itemText(it) { const c = cat(it.cat); const v = Object.values(it.values || {}).map(x => Array.isArray(x) ? x.join(' ') : x).join(' '); return [v, it.note, it.platform, c ? c.name : ''].join(' ').toLowerCase(); }
 function isDone(it) { const sf = statusField(it); return !!(sf && it.values && it.values.status === sf.options[sf.options.length - 1]); }
 function areaOf(it) {
-  const loc = (it.values && it.values.loc) || ''; if (!loc) return '';
-  const m = loc.match(/([\u4e00-\u9fa5]{1,2}區)/) || loc.match(/(北屯|西屯|南屯|中港|逢甲|一中|勤美|大里|太平|豐原|信義|大安|中山|松山|士林|板橋|新莊)/) || loc.match(/^(台北|臺北|新北|桃園|台中|臺中|台南|臺南|高雄|新竹|基隆|嘉義|宜蘭|花蓮)/);
-  return m ? m[1] : '';
+  const v = it.values || {};
+  /* 先看地點欄,沒有再看店名、重點(例如說明寫「台中北區 泰奶麻糬豆花」) */
+  for (const src of [v.loc, v.name, it.note]) {
+    const t = (src || '').replace(/\s+/g, ''); if (!t) continue;
+    const cityM = t.match(/(台北|臺北|新北|桃園|台中|臺中|台南|臺南|高雄|新竹|基隆|嘉義|宜蘭|花蓮|屏東|彰化|南投|雲林|苗栗|台東|臺東)/);
+    const city = cityM ? cityM[1].replace('臺', '台') : '';
+    const after = cityM ? t.slice(t.indexOf(cityM[1]) + cityM[1].length).replace(/^[市縣]/, '') : '';
+    let dist = (after.match(/^([\u4e00-\u9fa5]{1,3}?[區鄉鎮])/) || t.match(/(東區|西區|南區|北區|中區)/) || [])[1] || '';
+    if (dist.length === 3 && dist.endsWith('區')) dist = dist.slice(0, 2); /* 西屯區 → 西屯,北區保留 */
+    if (dist) return city + dist;
+    const hood = t.match(/(北屯|西屯|南屯|中港|逢甲|一中|勤美|大里|太平|豐原|信義|大安|中山|松山|士林|板橋|新莊)/);
+    if (hood) return (city || '') + hood[1];
+    if (city && src === v.loc) return city;
+  }
+  return '';
 }
 function statusField(it) { const c = cat(it.cat); return c ? c.fields.find(f => f.id === 'status') : null; }
 
