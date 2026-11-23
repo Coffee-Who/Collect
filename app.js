@@ -954,7 +954,7 @@ async function act(a, ds) {
       let cap = ad.caption; let ytAuthor = '';
       if (!cap.trim() && igCode(ad.url)) { S.busy = '讀取 IG 說明…'; render(); const c = await fetchIgCaption(ad.url); if (c) { cap = cleanShared(c); toast('已讀到 IG 說明'); } }
       if (ytId(ad.url)) { S.busy = '讀取 YouTube 標題…'; render(); const info = await ytTitle(ad.url); if (info) { cap = [info.title, cap].filter(Boolean).join('\n'); ytAuthor = info.author; } }
-      const imgs = ad.images.length ? ad.images.slice(0, 1) : (ytThumb(ad.url) ? [ytThumb(ad.url)] : []);
+      const imgs = ad.cover ? [ad.cover] : ad.images.length ? ad.images.slice(0, 1) : (ytThumb(ad.url) ? [ytThumb(ad.url)] : []);
       S.busy = ''; S.draft = analyze({ url: ad.url, caption: cap, ocr, images: imgs });
       if (ytAuthor && !S.draft.note.includes(ytAuthor)) S.draft.note = (S.draft.note ? S.draft.note + ' ' : '') + '(' + ytAuthor + ')';
       go('confirm'); break; }
@@ -1209,11 +1209,16 @@ function incoming(search) {
   S.autoSave = p.get('auto') === '1';
   if (search == null) history.replaceState(null, '', location.pathname);
   S.add = { url: url || '', caption: text.replace(url || '', '').trim(), images: [] };
+  /* 捷徑可以帶一張裁好的截圖當封面(img=base64) */
+  const b64 = (p.get('img') || '').replace(/\s/g, '').replace(/ /g, '+');
+  if (b64.length > 200) S.add.cover = { data: b64.startsWith('data:') ? b64 : 'data:image/jpeg;base64,' + b64, w: 3, h: 4 };
   S.view = 'add';
   return true;
 }
 /* 跑完分享流程:判斷 → 自動存(auto=1 時) */
 async function runShared() {
+  const cv = S.add && S.add.cover;
+  if (cv) await new Promise(r => { const im = new Image(); im.onload = () => { cv.w = im.naturalWidth; cv.h = im.naturalHeight; r(); }; im.onerror = () => { S.add.cover = null; r(); }; im.src = cv.data; });
   await act('analyze', {});
   if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; await act('save', {}); }
 }
