@@ -188,7 +188,15 @@ function nameBeforeAddress(t) {
     cand = (cand.split(/[|｜/／]/).map(x => x.trim()).find(x => x && !/^(店家|店名|餐廳|店舖)?(資訊|資料|名稱|介紹)$|^(店家|店名)$/.test(x)) || '').replace(/^[@#＠＃]|[@#＠＃].*$/g, '').replace(/^(店名|店家|地址)[:：]?/, '').trim();
     cand = cand.replace(/^[a-z0-9._]{5,30}\s+/, '').trim(); /* 開頭的 IG 帳號 */
     if (!/[\u4e00-\u9fff]{2}|[A-Za-z]{3}/.test(cand)) cand = '';
-    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
+    const PRICE = /\d+\s*(元|塊)|\$\s*\d|NT\$?|\d{3,}/i;
+    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand) && !PRICE.test(cand)) return cand;
+    /* 地址上一行是菜單或價錢:往前找像店名的那行(有「店、所、館、cafe、Table…」) */
+    const STORE = /(店|所|館|屋|堂|坊|廳|茶樓|商行|食堂|酒場|cafe|café|coffee|bar|kitchen|table|bistro|brunch|bakery|restaurant|diner)/i;
+    for (let k = 0; k < i; k++) {
+      let x = lines[k].replace(/[#＃]\S*/g, ' ').replace(/[@＠]\S*/g, ' ').replace(/^[a-z0-9._]{5,30}\s+/, '').replace(/[*＊~～✨]+/g, '').replace(/\s+/g, ' ').trim();
+      if (!x || x.length > 25 || !STORE.test(x) || PRICE.test(x) || /地址|營業|時間|電話|推薦|這家|附近|新開|[!！?？,，。]/.test(x)) continue;
+      return x;
+    }
   }
   return '';
 }
