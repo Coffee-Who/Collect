@@ -1190,7 +1190,7 @@ async function pasteShared() {
   if (!u) {
     /* 只有文字(例如捷徑截圖辨識出來的):沒有連結也照樣存 */
     if (t.replace(/\s/g, '').length < 10) { toast('剪貼簿裡沒有連結或文字'); return; }
-    S.autoSave = true; S.add = { url: '', caption: t, images: [] }; S.view = 'add'; await runShared(); return;
+    S.autoSave = true; S.add = { url: '', caption: cleanShared(stripChrome(t)), images: [] }; S.view = 'add'; await runShared(); return;
   }
   /* 連結以外的文字:可能是捷徑截圖辨識的字,或網頁轉成的文字。去掉 IG 介面字,剩下當說明 */
   const chrome = IG_CHROME;
