@@ -1116,6 +1116,9 @@ async function fetchIgCaption(url) {
   });
   try { const c = await Promise.any(IG_PROXIES.map(one)); ctl.abort(); return c; } catch (e) { return ''; } finally { clearTimeout(tm); }
 }
+const IG_CHROME = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|更多|讚|則留言|分享|收藏|追蹤|追蹤中|Follow|Following|原始音訊|•|·|[\d:：]{3,5}|[\d,.\s萬KkMm]+|©.*Meta.*|.*from Meta)$/i;
+/* 去掉 IG 介面文字(讚數、時間、選單字),截圖辨識或網頁轉文字時用 */
+function stripChrome(t) { return (t || '').split(/\n/).map(x => x.trim()).filter(x => x && !IG_CHROME.test(x)).join('\n'); }
 function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
 function captionFromHtml(h) {
   const metas = h.match(/<meta\b[^>]*>/gi) || [];
@@ -1135,7 +1138,7 @@ function incoming(search) {
   let pu = p.get('url') || '', pt = p.get('text') || '';
   /* 捷徑裡兩個變數放反也沒關係:哪個是連結就當連結 */
   if (pu && !/^https?:\/\//i.test(pu.trim()) && /^https?:\/\//i.test(pt.trim())) { const t = pu; pu = pt; pt = t; }
-  const text = cleanShared([p.get('title'), pt].filter(Boolean).join('\n'));
+  const text = cleanShared(stripChrome([p.get('title'), pt].filter(Boolean).join('\n')));
   const url = pu.trim() || firstUrl(text);
   if (!url && !text) return;
   S.autoSave = p.get('auto') === '1';
@@ -1190,7 +1193,7 @@ async function pasteShared() {
     S.autoSave = true; S.add = { url: '', caption: t, images: [] }; S.view = 'add'; await runShared(); return;
   }
   /* 連結以外的文字:可能是捷徑截圖辨識的字,或網頁轉成的文字。去掉 IG 介面字,剩下當說明 */
-  const chrome = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|更多|讚|則留言|分享|收藏|追蹤|追蹤中|Follow|Following|原始音訊|•|·|[\d:：]{3,5}|[\d,.\s萬KkMm]+|©.*Meta.*|.*from Meta)$/i;
+  const chrome = IG_CHROME;
   const body = t.replace(u, '').split(/[\n。]/).map(x => x.trim()).filter(x => x && !chrome.test(x)).join('\n');
   const loginPage = /Afrikaans|Meta 驗證|Meta Verified|Čeština|Deutsch.*Español/.test(body);
   if (body.replace(/\s/g, '').length >= 15 && !loginPage) {
