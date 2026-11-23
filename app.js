@@ -1149,6 +1149,11 @@ async function pasteShared() {
   if (m) { if (incoming(m[1])) await runShared(); else toast('剪貼簿裡沒有連結'); return; }
   const u = firstUrl(t); if (!u) { toast('剪貼簿裡沒有連結'); return; }
   if (t.length < 400) setTimeout(() => toast('剪貼簿只有連結(' + t.length + ' 字),沒有網頁內容'), 600);
+  else {
+    /* 捷徑給的是網頁「轉成文字」的版本:去掉 IG 介面字,剩下當說明 */
+    const body = t.replace(u, '').split(/\n/).map(x => x.trim()).filter(x => x && !/^(Instagram|登入|註冊|Log in|Sign up|查看更多|View more|More|讚|則留言|分享|收藏|追蹤|Follow|•)$/i.test(x)).join('\n');
+    S.autoSave = true; S.add = { url: normalizeUrl(u), caption: cleanShared(body), images: [] }; S.view = 'add'; await runShared(); return;
+  }
   S.autoSave = false; S.add = { url: u, caption: t.replace(u, '').trim(), images: [] }; await act('analyze', {});
 }
 
