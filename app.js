@@ -310,6 +310,9 @@ window.gm_authFailure = () => {
   toast('Google 地圖金鑰被拒絕,先改用簡易地圖');
   if (S.view === 'map') { const el = document.getElementById('gmap'); if (el) { el.innerHTML = ''; simpleMap(el, mapItems()); const src = document.getElementById('mapsrc'); if (src) src.textContent = '簡易地圖(Google 金鑰被拒絕,請檢查網址限制)'; } }
 };
+/* 把 Google 地圖的錯誤代碼抓出來顯示,方便查原因 */
+let mapsErr = '';
+['error', 'warn'].forEach(k => { const o = console[k]; console[k] = function (...args) { try { const t = args.join(' '); const m = t.match(/([A-Za-z]+MapError)/); if (m && !mapsErr) { mapsErr = m[1]; toast('Google 地圖錯誤:' + mapsErr); const src = document.getElementById('mapsrc'); if (src) src.textContent = 'Google 地圖錯誤:' + mapsErr; } } catch (e) {} return o.apply(this, args); }; });
 function ensureMaps() {
   if (mapsAuthFail) return Promise.resolve(false);
   if (window.google && window.google.maps && window.google.maps.Map) return Promise.resolve(true);
