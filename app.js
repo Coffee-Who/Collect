@@ -4,6 +4,7 @@
 
 /* ---------- 圖示 ---------- */
 const I = {
+  clip: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1"/></svg>',
   plus: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>',
   back: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
   close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -594,7 +595,7 @@ function locBlockHTML(it) {
 function vFeed() {
   const tabs = [{ id: 'all', name: '全部' }].concat(CATS.map(c => ({ id: c.id, name: c.name })));
   return `<header class="head">
-    <div class="head-row"><h1>收藏</h1><button class="icon" data-a="new" aria-label="存一筆">${I.plus}</button></div>
+    <div class="head-row"><h1>收藏</h1><div class="row" style="gap:4px"><button class="pastebtn" data-a="pasteshared" aria-label="貼上剛分享的連結">${I.clip}貼上</button><button class="icon" data-a="new" aria-label="存一筆">${I.plus}</button></div></div>
     ${S.searching ? `<div class="search">${I.search}<label class="sr" for="q">搜尋</label><input id="q" data-m="q" value="${esc(S.q)}" placeholder="店名、地區、重點" autocomplete="off" enterkeyhint="search"><button class="icon" style="width:36px;height:36px" data-a="closesearch" aria-label="關閉搜尋">${I.close}</button></div>` : ''}
     <nav class="tabs">${tabs.map(t => `<button class="tab ${S.tab === t.id ? 'on' : ''}" data-a="tab" data-id="${t.id}">${esc(t.name)}</button>`).join('')}</nav>
     ${filtersHTML()}
@@ -876,6 +877,7 @@ async function act(a, ds) {
     case 'search': S.searching = true; S.view = 'feed'; render(); setTimeout(() => { const q = $('#q'); if (q) q.focus(); }, 30); break;
     case 'closesearch': S.searching = false; S.q = ''; render(); break;
     case 'cats': go('cats'); break;
+    case 'pasteshared': pasteShared(); break;
     case 'new': S.add = { url: '', caption: '', images: [] }; go('add'); break;
     case 'paste': try { const t = await navigator.clipboard.readText(); const u = firstUrl(t); if (u) { S.add.url = u; if (t.trim() !== u) S.add.caption = S.add.caption || t.replace(u, '').trim(); if (!S.add.images.length) { act('analyze', {}); } else render(); } else toast('剪貼簿裡沒有連結'); } catch (err) { const el = $('#url'); if (el) el.focus(); toast('請長按輸入框選「貼上」'); } break;
     case 'rmshot': S.add.images.splice(+ds.i, 1); render(); break;
@@ -1067,8 +1069,8 @@ function cleanShared(t) {
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
 }
-function incoming() {
-  const p = new URLSearchParams(location.search);
+function incoming(search) {
+  const p = new URLSearchParams(search == null ? location.search : search);
   let pu = p.get('url') || '', pt = p.get('text') || '';
   /* 捷徑裡兩個變數放反也沒關係:哪個是連結就當連結 */
   if (pu && !/^https?:\/\//i.test(pu.trim()) && /^https?:\/\//i.test(pt.trim())) { const t = pu; pu = pt; pt = t; }
@@ -1076,9 +1078,25 @@ function incoming() {
   const url = pu.trim() || firstUrl(text);
   if (!url && !text) return;
   S.autoSave = p.get('auto') === '1';
-  history.replaceState(null, '', location.pathname);
+  if (search == null) history.replaceState(null, '', location.pathname);
   S.add = { url: url || '', caption: text.replace(url || '', '').trim(), images: [] };
   S.view = 'add';
+  return true;
+}
+/* 跑完分享流程:判斷 → 自動存(auto=1 時) */
+async function runShared() {
+  await act('analyze', {});
+  if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; await act('save', {}); }
+}
+/* 主畫面 App 用:讀剪貼簿(捷徑複製的網址或一般連結) */
+async function pasteShared() {
+  let t = '';
+  try { t = await navigator.clipboard.readText(); } catch (e) { toast('沒有讀到剪貼簿,請再按一次並點「貼上」'); return; }
+  t = (t || '').trim(); if (!t) { toast('剪貼簿是空的'); return; }
+  const m = t.match(/coffee-who\.github\.io\/Collect\/?(\?\S*)/i);
+  if (m) { if (incoming(m[1])) await runShared(); else toast('剪貼簿裡沒有連結'); return; }
+  const u = firstUrl(t); if (!u) { toast('剪貼簿裡沒有連結'); return; }
+  S.autoSave = false; S.add = { url: u, caption: t.replace(u, '').trim(), images: [] }; await act('analyze', {});
 }
 
 /* ---------- 啟動 ---------- */
@@ -1098,7 +1116,7 @@ function incoming() {
   await applySampleGeo();
   render();
   setTimeout(geoQueue, 1500);
-  if (fromShare) { await act('analyze', {}); if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; await act('save', {}); } }
+  if (fromShare) await runShared();
   if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(() => {}); }
 })();
 })();
