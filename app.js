@@ -176,8 +176,24 @@ function extractAddress(t) {
   const m = t.replace(/\s+/g, '').match(/(?:台北|臺北|新北|桃園|台中|臺中|台南|臺南|高雄|新竹|基隆|嘉義|宜蘭|花蓮|屏東|彰化|南投|雲林|苗栗|台東|臺東|澎湖|金門)[市縣][^,,。!!()()「」]{2,40}?號/);
   return m ? m[0] : '';
 }
+/* 店名通常寫在地址的上一行,例如「Amber glow」換行「臺中市大里區…」 */
+function nameBeforeAddress(t) {
+  const lines = t.split(/\n/).map(x => x.replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F📍🏠⏰❤]/gu, '').trim()).filter(Boolean);
+  const re = /(?:台北|臺北|新北|桃園|台中|臺中|台南|臺南|高雄|新竹|基隆|嘉義|宜蘭|花蓮|屏東|彰化|南投|雲林|苗栗|台東|臺東|澎湖|金門)[市縣]/;
+  for (let i = 0; i < lines.length; i++) {
+    if (!re.test(lines[i])) continue;
+    const before = lines[i].split(re)[0].replace(/[::\-—|｜]+$/, '').trim();
+    let j = i - 1; while (j >= 0 && /^[@#]/.test(lines[j])) j--; /* 跳過 @帳號、#標籤 行 */
+    let cand = before.length >= 2 ? before : (lines[j] || '');
+    cand = cand.split(/[|｜/／]/)[0].replace(/^[@#]|[@#].*$/g, '').replace(/^(店名|店家|地址)[::]?/, '').trim();
+    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[。!！?？]/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
+  }
+  return '';
+}
 function extractName(t, c) {
-  if (!c || c.id !== 'food') return '';
+  if (!c || !['food', 'trip'].includes(c.id)) return '';
+  const nb = nameBeforeAddress(t); if (nb) return nb;
+  if (c.id !== 'food') return '';
   const K = '(?:麻糬|拉麵|咖啡|食堂|餐廳|小吃|麵店|甜點|冰店|早午餐|火鍋|麵|飯|粥|豆花|燒肉|鍋|館)';
   const pats = [
     new RegExp('(?:台北|臺北|新北|台中|臺中|台南|臺南|高雄|新竹|桃園)([\\u4e00-\\u9fa5]{1,4}?[記家號屋堂軒坊][\\u4e00-\\u9fa5]{0,3}?' + K + ')'),
@@ -1117,7 +1133,7 @@ async function fetchIgCaption(url) {
   });
   try { const c = await Promise.any(IG_PROXIES.map(one)); ctl.abort(); return c; } catch (e) { return ''; } finally { clearTimeout(tm); }
 }
-const IG_CHROME = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|更多|讚|則留言|分享|收藏|追蹤|追蹤中|Follow|Following|原始音訊|•|·|[\d:：]{3,5}|[\d,.\s萬KkMm]+|©.*Meta.*|.*from Meta)$/i;
+const IG_CHROME = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|更多|讚|則留言|分享|收藏|追蹤|追蹤中|Follow|Following|原始音訊|•|·|[\d:：\s,.萬KkMm]+|©.*Meta.*|.*from Meta)$/i;
 /* 去掉 IG 介面文字(讚數、時間、選單字),截圖辨識或網頁轉文字時用 */
 function stripChrome(t) { return (t || '').split(/\n/).map(x => x.trim()).filter(x => x && !IG_CHROME.test(x)).join('\n'); }
 function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
