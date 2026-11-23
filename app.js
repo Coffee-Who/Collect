@@ -562,6 +562,8 @@ async function doImport() {
 }
 
 /* ---------- 設定:地點與地圖 ---------- */
+/* Safari 書籤小工具:在 IG 網頁上點一下,讀出說明後直接開收藏存入 */
+const BOOKMARKLET = "javascript:(function(){var m=function(p){var e=document.querySelector('meta[property=\"'+p+'\"],meta[name=\"'+p+'\"]');return e?e.content:''};var t=m('og:description')||m('description');if(!t){var h=document.querySelector('h1');t=h?h.innerText:''}var u=location.href.split('?')[0];location.href='https://coffee-who.github.io/Collect/?auto=1&url='+encodeURIComponent(u)+'&text='+encodeURIComponent(t)})();";
 function mapSettingsHTML() {
   const u = gUsage();
   return `<span class="label" style="margin-top:8px">地點與地圖</span>
@@ -759,6 +761,9 @@ function vCats() {
     <label class="li" style="cursor:pointer"><span class="grow">系統沒把握時,先問我<small>關鍵字只命中一個時,要你確認分類</small></span><input type="checkbox" data-a="askset" ${SET.askWhenUnsure ? 'checked' : ''} style="width:22px;height:22px"></label>
     ${ITEMS.some(i => i.sample) ? '<button class="btn danger" data-a="clearsamples">清除範例資料</button>' : '<button class="btn ghost" data-a="samples">載入範例資料</button>'}
     ${mapSettingsHTML()}
+    <span class="label" style="margin-top:8px">從 Safari 存 IG</span>
+    <p class="note">在 Safari 打開 IG 貼文後,點書籤「存到收藏」就會讀出說明、自動分類存好。先按下面按鈕複製書籤程式碼,再照說明設定一次。</p>
+    <button class="btn ghost" data-a="copybm">複製書籤程式碼</button>
     <span class="label" style="margin-top:8px">備份</span>
     <p class="note">資料只存在這支手機的瀏覽器裡。換手機、清除 Safari 資料或太久沒打開都可能讓資料消失,請定期匯出。共 ${ITEMS.length} 筆。</p>
     <div class="row"><button class="btn ghost" data-a="export">匯出備份</button><label class="btn ghost" style="display:flex;align-items:center;justify-content:center;cursor:pointer">匯入備份<input type="file" accept="application/json,.json" data-a="import" class="sr"></label></div>
@@ -891,6 +896,7 @@ async function act(a, ds) {
     case 'closesearch': S.searching = false; S.q = ''; render(); break;
     case 'cats': go('cats'); break;
     case 'pasteshared': pasteShared(); break;
+    case 'copybm': try { await navigator.clipboard.writeText(BOOKMARKLET); toast('已複製書籤程式碼'); } catch (e) { prompt('長按全選後拷貝:', BOOKMARKLET); } break;
     case 'igread': {
       const it = ITEMS.find(i => i.id === ds.id); if (!it) break;
       toast('讀取 IG 說明中…'); const c = await fetchIgCaption(it.url);
