@@ -431,7 +431,7 @@ function imgSrc(img) {
   return '';
 }
 /* 卡片封面:IG/FB/Threads 有官方預覽時,優先用預覽,Google 店家照片只在地圖上用 */
-function coverImg(it) { const im = firstImg(it); return im && im.gphoto && embedUrl(it.url) ? null : im; }
+function coverImg(it) { const im = firstImg(it); return im && im.gphoto && embedUrl(it.url) && SET.igCover !== 'photo' ? null : im; }
 function firstImg(it) { const im = it && it.images && it.images.find(x => imgSrc(x)); return im || null; }
 
 /* ---------- 地圖檢視 ---------- */
@@ -604,6 +604,7 @@ function mapSettingsHTML() {
       <p class="note">金鑰只存在這支手機。要在 Google Cloud 啟用 Maps JavaScript API 和 Places API (New),並設定使用上限。</p>`
       : `<p class="note">${BUILTIN_KEY ? '用 App 內建的金鑰,不用設定。今天的額度用完時,地圖會改成在 Google 地圖開啟。' : '內建金鑰還沒設定(開發中)。可以先改用自己的金鑰;沒有金鑰時會用簡易地圖和免費的地址查詢。'}</p>`}
     <div class="field"><span class="label">每天最多查詢</span><div class="seg" style="grid-template-columns:repeat(4,minmax(0,1fr))">${[50, 150, 300, 0].map(v => `<button class="${(+SET.gcap) === v ? 'on' : ''}" data-a="gcap" data-id="${v}">${v || '不限'}</button>`).join('')}</div></div>
+    <div class="field"><span class="label">IG / FB 貼文的封面</span><div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><button class="${SET.igCover !== 'photo' ? 'on' : ''}" data-a="igcover" data-id="embed">貼文預覽(影片有播放鍵)</button><button class="${SET.igCover === 'photo' ? 'on' : ''}" data-a="igcover" data-id="photo">店家照片(乾淨)</button></div></div>
     <label class="li" style="cursor:pointer"><span class="grow">沒照片時用 Google 店家照片<small>IG 預覽抓不到時自動補封面(要有金鑰)</small></span><input type="checkbox" data-a="gphoto" ${SET.gphoto ? 'checked' : ''} style="width:22px;height:22px"></label>
     <span class="label">本月用量(這支手機,今天已查詢 ${u.dn} 次)</span>
     ${G_KINDS.map(g => { const n = u.k[g.k] || 0; return `<div class="ubar"><div class="row" style="justify-content:space-between;font-size:13px"><span style="color:var(--ink2)">${g.label}</span><span>${n.toLocaleString()} / ${g.cap.toLocaleString()}</span></div><div class="ub"><i style="width:${Math.max(1, Math.min(100, n / g.cap * 100))}%"></i></div></div>`; }).join('')}
@@ -709,7 +710,7 @@ function vDetail() {
     <div class="dhero">${visualHTML(it, true)}
       <button class="fbtn l" data-a="back" aria-label="返回">${I.back}</button>
       <button class="fbtn r" data-a="menu" data-id="${it.id}" aria-label="更多選項">${I.more}</button>
-      ${it.url && embedUrl(it.url) && !coverImg(it) ? `<a class="hero-tap" href="${esc(it.url)}" target="_blank" rel="noopener" aria-label="在 ${esc(it.platform || '原貼文')} 播放"><span>▶ 在 ${esc(it.platform || '原貼文')} 播放</span></a>` : ''}
+      ${it.url && embedUrl(it.url) && !coverImg(it) ? `<a class="hero-tap" href="${esc(it.url)}" target="_blank" rel="noopener" aria-label="在 ${esc(it.platform || '原貼文')} 播放"></a>` : ''}
       ${it.url ? `<a class="hero-open" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.platform || '原貼文')} ↗</a>` : ''}</div>
     <div class="dbar">
       <div class="row" style="gap:2px">
@@ -929,6 +930,7 @@ async function act(a, ds) {
     case 'closesearch': S.searching = false; S.q = ''; render(); break;
     case 'cats': go('cats'); break;
     case 'pasteshared': pasteShared(); break;
+    case 'igcover': SET.igCover = ds.id; await saveSet(); render(); break;
     case 'copybm': try { await navigator.clipboard.writeText(BOOKMARKLET); toast('已複製書籤程式碼'); } catch (e) { prompt('長按全選後拷貝:', BOOKMARKLET); } break;
     case 'igread': {
       const it = ITEMS.find(i => i.id === ds.id); if (!it) break;
