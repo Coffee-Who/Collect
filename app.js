@@ -624,12 +624,12 @@ function wallHTML() {
 /* 讓每格高度不一樣:依 id 算出固定的變化,重新整理也不會跳動 */
 function vary(id, n) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % n; }
 /* IG 官方預覽:切掉上方帳號列和下方按讚列,只留影片/照片 */
-const IG_TOP = 70;
+const IG_TOP = 62; /* 帳號列高度(預覽框寬 340 時) */
 function isIgEmbed(it) { return /instagram\.com/.test(embedUrl(it.url) || ''); }
 function pinRatio(it) {
   const img = firstImg(it);
   if (img) return Math.min(1.6, Math.max(0.7, img.h / img.w));
-  if (isIgEmbed(it)) return it.kind === 'Reel' ? 1.25 : 1;
+  if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [0.85, 0.92][vary(it.id, 2)];
   if (embedUrl(it.url)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
 }
@@ -638,7 +638,7 @@ function visualHTML(it, big) {
   const attrs = big ? '' : `data-a="open" data-id="${it.id}" data-lp="${it.id}" role="button" tabindex="0" aria-label="查看 ${esc(titleOf(it))}"`;
   const src = it.platform ? `<span class="src">${esc(it.platform)}</span>` : '';
   if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
-  if (emb) return `<div class="embed${isIgEmbed(it) ? ' ig' : ''}" ${attrs} style="aspect-ratio:1/${r}"><div class="efall"><span class="s">${esc([it.platform, it.kind].filter(Boolean).join(' '))} · 預覽載入中</span><span class="t">${esc(titleOf(it))}</span></div><iframe src="${esc(emb)}" ${isIgEmbed(it) ? `data-crop="${IG_TOP}"` : ''} style="height:${Math.round(340 * r) + (isIgEmbed(it) ? IG_TOP + 260 : 0)}px" loading="lazy" title="${esc(it.platform)} 官方預覽" scrolling="no" tabindex="-1"></iframe><span class="cover"></span>${big ? '' : src}</div>`;
+  if (emb) return `<div class="embed${isIgEmbed(it) ? ' ig' : ''}" ${attrs} style="aspect-ratio:1/${r}"><div class="efall"><span class="s">${esc([it.platform, it.kind].filter(Boolean).join(' '))} · 預覽載入中</span><span class="t">${esc(titleOf(it))}</span></div><iframe src="${esc(emb)}" ${isIgEmbed(it) ? `data-ig="${it.kind === 'Reel' ? 'reel' : 'post'}" data-r="${r}"` : ''} style="height:${isIgEmbed(it) ? 900 : Math.round(340 * r)}px" loading="lazy" title="${esc(it.platform)} 官方預覽" scrolling="no" tabindex="-1"></iframe><span class="cover"></span>${big ? '' : src}</div>`;
   return `<div class="textpin" ${attrs} style="aspect-ratio:1/${r}"><span class="s">${esc([it.platform, c ? c.name : ''].filter(Boolean).join(' · '))}</span><span class="t">${esc(titleOf(it))}</span></div>`;
 }
 function pinHTML(it) {
@@ -809,7 +809,12 @@ function render() {
   if (S.view === 'confirm') attachAutocomplete();
 }
 function fitEmbeds() {
-  app.querySelectorAll('.embed').forEach(el => { const f = el.querySelector('iframe'); if (f) { const k = el.clientWidth / 340, c = +(f.dataset.crop || 0); f.style.transform = 'translateY(' + (-c * k) + 'px) scale(' + k + ')'; } });
+  app.querySelectorAll('.embed').forEach(el => { const f = el.querySelector('iframe'); if (!f) return; const k = el.clientWidth / 340;
+    if (!f.dataset.ig) { f.style.transform = 'scale(' + k + ')'; return; }
+    /* IG:切掉帳號列與下方按讚列;Reel 再放大去掉左右黑邊,置中裁切 */
+    const reel = f.dataset.ig === 'reel', r = +f.dataset.r, mediaH = reel ? 425 : 340, z = reel ? 340 / 241 : 1, sc = k * z;
+    const vis = 340 * k * r, tx = reel ? -49.5 * sc : 0, ty = -IG_TOP * sc - (mediaH * sc - vis) / 2;
+    f.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + sc + ')'; });
 }
 window.addEventListener('resize', fitEmbeds);
 /* 嵌入框被擋(例如預覽環境)時,改顯示文字卡 */
