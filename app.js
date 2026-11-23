@@ -1102,16 +1102,13 @@ const IG_PROXIES = [
 async function fetchIgCaption(url) {
   const ig = igCode(url); if (!ig) return '';
   const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
-  for (const mk of IG_PROXIES) {
-    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 8000);
-    try {
-      const r = await fetch(mk(embed), { signal: ctl.signal }); clearTimeout(tm);
-      if (!r.ok) continue;
-      const h = await r.text(); const cap = captionFromHtml(h);
-      if (cap && cap.replace(/\s/g, '').length >= 6 && !/Afrikaans|Meta 驗證|Meta Verified/.test(cap)) return cap;
-    } catch (e) { clearTimeout(tm); }
-  }
-  return '';
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 5000); /* 最多等 5 秒,同時問幾個轉接服務 */
+  const one = mk => fetch(mk(embed), { signal: ctl.signal }).then(r => r.ok ? r.text() : '').then(h => {
+    const cap = captionFromHtml(h || '');
+    if (cap && cap.replace(/\s/g, '').length >= 6 && !/Afrikaans|Meta 驗證|Meta Verified/.test(cap)) return cap;
+    throw new Error('no caption');
+  });
+  try { const c = await Promise.any(IG_PROXIES.map(one)); ctl.abort(); return c; } catch (e) { return ''; } finally { clearTimeout(tm); }
 }
 function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
 function captionFromHtml(h) {
