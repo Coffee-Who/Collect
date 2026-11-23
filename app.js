@@ -186,13 +186,22 @@ function nameBeforeAddress(t) {
     let j = i - 1; while (j >= 0 && /^[@#＠＃]/.test(lines[j])) j--; /* 跳過 @帳號、#標籤 行 */
     let cand = before.length >= 2 ? before : (lines[j] || '');
     cand = (cand.split(/[|｜/／]/).map(x => x.trim()).find(x => x && !/^(店家|店名|餐廳|店舖)?(資訊|資料|名稱|介紹)$|^(店家|店名)$/.test(x)) || '').replace(/^[@#＠＃]|[@#＠＃].*$/g, '').replace(/^(店名|店家|地址)[:：]?/, '').trim();
+    cand = cand.replace(/^[a-z0-9._]{5,30}\s+/, '').trim(); /* 開頭的 IG 帳號 */
+    if (!/[\u4e00-\u9fff]{2}|[A-Za-z]{3}/.test(cand)) cand = '';
     if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
   }
   return '';
 }
+/* 店名有中文也有英文時,中文放前面:「C'est Bon十分樂載」→「十分樂載 C'est Bon」 */
+function zhFirst(n) {
+  if (!n || !/[\u4e00-\u9fff]/.test(n) || !/[A-Za-z]/.test(n)) return n;
+  const m = n.match(/^([^\u4e00-\u9fff]+?)\s*([\u4e00-\u9fff][^A-Za-z]*)$/);
+  if (m && /[A-Za-z]/.test(m[1])) return (m[2].trim() + ' ' + m[1].trim()).trim();
+  return n.replace(/([\u4e00-\u9fff])([A-Za-z])/, '$1 $2');
+}
 function extractName(t, c) {
   if (!c || !['food', 'trip'].includes(c.id)) return '';
-  const nb = nameBeforeAddress(t); if (nb) return nb;
+  const nb = nameBeforeAddress(t); if (nb) return zhFirst(nb);
   if (c.id !== 'food') return '';
   const K = '(?:麻糬|拉麵|咖啡|食堂|餐廳|小吃|麵店|甜點|冰店|早午餐|火鍋|麵|飯|粥|豆花|燒肉|鍋|館)';
   const pats = [
@@ -279,7 +288,7 @@ async function runOcr(images, onProgress) {
 function toast(m) { let t = document.querySelector('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); } t.textContent = m; clearTimeout(toast.t); toast.t = setTimeout(() => t.remove(), 2000); }
 async function saveCats() { await store.setMeta('cats', CATS); }
 async function saveSet() { await store.setMeta('settings', SET); }
-function titleOf(it) { return (it.values && it.values.name) || (it.note ? it.note.split('\n')[0].slice(0, 18) : '') || ((it.platform || '連結') + (it.kind ? ' ' + it.kind : '') + ' · 內容待補'); }
+function titleOf(it) { return (it.values && it.values.name) || (it.note ? (it.note.split('\n').find(l => /[\u4e00-\u9fff]{2}|[A-Za-z]{3}/.test(l)) || '').slice(0, 18) : '') || ((it.platform || '連結') + (it.kind ? ' ' + it.kind : '') + ' · 內容待補'); }
 function itemText(it) { const c = cat(it.cat); const v = Object.values(it.values || {}).map(x => Array.isArray(x) ? x.join(' ') : x).join(' '); return [v, it.note, it.platform, c ? c.name : ''].join(' ').toLowerCase(); }
 function isDone(it) { const sf = statusField(it); return !!(sf && it.values && it.values.status === sf.options[sf.options.length - 1]); }
 function areaOf(it) {
@@ -1118,7 +1127,7 @@ function cleanShared(t) {
   if (!t) return '';
   const ta = document.createElement('textarea'); ta.innerHTML = t; t = ta.value;
   t = t.replace(/\uFFFD/g, '');
-  t = t.replace(/^\s*[a-z0-9._]{3,30}\s*(?=[\u4e00-\u9fff])/m, ''); /* 開頭的 IG 帳號名(小寫英數,可能沒空格) */
+  t = t.replace(/^\s*[a-z0-9._]{3,30}\s*(?=[\u4e00-\u9fff])/m, '').replace(/^\s*[a-z0-9._]{5,30}\s+(?=\S)/, ''); /* 開頭的 IG 帳號名(小寫英數,可能沒空格) */
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
 }
