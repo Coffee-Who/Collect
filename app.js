@@ -1154,7 +1154,7 @@ async function pasteShared() {
     /* 捷徑給的是網頁「轉成文字」的版本:去掉 IG 介面字,剩下當說明 */
     const chrome = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|讚|則留言|分享|收藏|追蹤|Follow|•|·|©.*Meta.*|.*from Meta)$/i;
     const body = t.replace(u, '').split(/[\n。]/).map(x => x.trim()).filter(x => x && !chrome.test(x)).join('\n');
-    if (body.replace(/\s/g, '').length < 15) { setTimeout(() => toast('IG 只回了登入頁,沒有貼文內容,先只存連結'), 600); S.autoSave = true; S.add = { url: normalizeUrl(u), caption: '', images: [] }; S.view = 'add'; await runShared(); return; }
+    if (body.replace(/\s/g, '').length < 15 || /Afrikaans|Meta 驗證|Meta Verified|Čeština|Deutsch.*Español/.test(body)) { setTimeout(() => toast('IG 只回了登入頁,沒有貼文內容,先只存連結'), 600); S.autoSave = true; S.add = { url: normalizeUrl(u), caption: '', images: [] }; S.view = 'add'; await runShared(); return; }
     S.autoSave = true; S.add = { url: normalizeUrl(u), caption: cleanShared(body), images: [] }; S.view = 'add'; await runShared(); return;
   }
   S.autoSave = false; S.add = { url: u, caption: t.replace(u, '').trim(), images: [] }; await act('analyze', {});
