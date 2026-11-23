@@ -1,5 +1,5 @@
 /* 離線快取:有網路時一律抓最新版,沒網路才用快取 */
-const CACHE = 'clipbox-v20';
+const CACHE = 'clipbox-v21';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-180.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

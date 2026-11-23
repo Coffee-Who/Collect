@@ -421,6 +421,8 @@ function imgSrc(img) {
   if (img.gphoto && gKey()) return 'https://places.googleapis.com/v1/' + img.gphoto + '/media?maxWidthPx=600&key=' + encodeURIComponent(gKey());
   return '';
 }
+/* 卡片封面:IG/FB/Threads 有官方預覽時,優先用預覽,Google 店家照片只在地圖上用 */
+function coverImg(it) { const im = firstImg(it); return im && im.gphoto && embedUrl(it.url) ? null : im; }
 function firstImg(it) { const im = it && it.images && it.images.find(x => imgSrc(x)); return im || null; }
 
 /* ---------- 地圖檢視 ---------- */
@@ -663,14 +665,14 @@ function vary(id, n) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.
 const IG_TOP = 62; /* 帳號列高度(預覽框寬 340 時) */
 function isIgEmbed(it) { return /instagram\.com/.test(embedUrl(it.url) || ''); }
 function pinRatio(it) {
-  const img = firstImg(it);
+  const img = coverImg(it);
   if (img) return Math.min(1.6, Math.max(0.7, img.h / img.w));
   if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [0.85, 0.92][vary(it.id, 2)];
   if (embedUrl(it.url)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
 }
 function visualHTML(it, big) {
-  const img = firstImg(it); const c = cat(it.cat); const emb = !img && embedUrl(it.url); const r = pinRatio(it);
+  const img = coverImg(it); const c = cat(it.cat); const emb = !img && embedUrl(it.url); const r = pinRatio(it);
   const attrs = big ? '' : `data-a="open" data-id="${it.id}" data-lp="${it.id}" role="button" tabindex="0" aria-label="查看 ${esc(titleOf(it))}"`;
   const src = it.platform ? `<span class="src">${esc(it.platform)}</span>` : '';
   if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
@@ -678,7 +680,7 @@ function visualHTML(it, big) {
   return `<div class="textpin" ${attrs} style="aspect-ratio:1/${r}"><span class="s">${esc([it.platform, c ? c.name : ''].filter(Boolean).join(' · '))}</span><span class="t">${esc(titleOf(it))}</span></div>`;
 }
 function pinHTML(it) {
-  const img = firstImg(it); const emb = !img && embedUrl(it.url); const d = S.near ? distOf(it) : null;
+  const img = coverImg(it); const emb = !img && embedUrl(it.url); const d = S.near ? distOf(it) : null;
   return `<article class="pin">${visualHTML(it)}<div class="pinfoot"><span class="n">${img || emb ? esc(titleOf(it)) : ''}${d != null ? `<small class="dist">${distTxt(d)}</small>` : ''}</span><button class="more" data-a="menu" data-id="${it.id}" aria-label="${esc(titleOf(it))} 的選項">${I.more}</button></div></article>`;
 }
 function wallOf(list) {
