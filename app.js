@@ -26,7 +26,7 @@ function defaultCats() {
     { id: 'food', name: '美食', fields: [
       { id: 'name', name: '店名', type: 'text' },
       { id: 'loc', name: '地點', type: 'location' },
-      { id: 'kind', name: '類型', type: 'multi', options: ['甜點', '伴手禮', '小吃', '拉麵', '日式', '泰式', '咖啡', '火鍋', '早午餐', '餐酒館'] },
+      { id: 'kind', name: '類型', type: 'multi', options: ['甜點', '伴手禮', '小吃', '拉麵', '日式', '泰式', '咖啡', '火鍋', '早午餐', '餐酒館', '麵食'] },
       { id: 'price', name: '價位', type: 'single', options: ['$', '$$', '$$$'] },
       { id: 'status', name: '狀態', type: 'single', options: ['想吃', '吃過'] }],
       keywords: ['餐廳', '必吃', '菜單', '美食', '好吃', '口味', '麻糬', '拉麵', '咖啡', '甜點', '小吃', '伴手禮', '排隊', '早午餐', '火鍋', '泰式', '布丁', '吃'] },
@@ -186,7 +186,7 @@ function nameBeforeAddress(t) {
     let j = i - 1; while (j >= 0 && /^[@#]/.test(lines[j])) j--; /* 跳過 @帳號、#標籤 行 */
     let cand = before.length >= 2 ? before : (lines[j] || '');
     cand = cand.split(/[|｜/／]/)[0].replace(/^[@#]|[@#].*$/g, '').replace(/^(店名|店家|地址)[::]?/, '').trim();
-    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[。!！?？]/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
+    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
   }
   return '';
 }
@@ -200,8 +200,12 @@ function extractName(t, c) {
     new RegExp('([\\u4e00-\\u9fa5]{1,3}[記家號屋堂軒坊][\\u4e00-\\u9fa5]{0,3}?' + K + ')'),
     /[「『]([^」』]{2,14})[」』]/
   ];
-  for (const p of pats) { const m = t.match(p); if (m) return m[1]; }
+  for (const p of pats) { const m = t.match(p); if (m && !/留言|評論|連結|這裡|點擊|私訊|主頁|限動/.test(m[1])) return m[1]; }
   return '';
+}
+/* 重點:保留完整說明(去掉只有 #標籤 的行),最多 1500 字 */
+function fullNote(t) {
+  return t.split(/\n/).map(x => x.trim()).filter(x => x && !/^(#\S+\s*)+$/.test(x)).join('\n').slice(0, 1500);
 }
 function summarize(t) {
   const parts = t.replace(/#\S+/g, '').split(/[。!!??\n]/).map(s => s.trim()).filter(s => s.length > 6);
@@ -233,12 +237,13 @@ function analyze(input) {
     if (f.id === 'name' && name) { d.values.name = name; filled.push(f.name); }
     else if (f.type === 'location' && addr) { d.values[f.id] = addr; filled.push(f.name); }
     else if (f.type === 'multi') {
-      const syn = { '甜點': ['甜點', '麻糬', '蛋糕', '豆花', '冰'], '伴手禮': ['伴手禮'] };
-      const pick = f.options.filter(o => (syn[o] || [o]).some(w => text.includes(w)));
+      const syn = { '甜點': ['甜點', '麻糬', '蛋糕', '豆花', '冰淇淋', '剉冰', '雪花冰', '布丁', '提拉米蘇', '千層', '鬆餅', '可麗露'], '伴手禮': ['伴手禮'], '咖啡': ['咖啡', '拿鐵', 'cafe', 'café'], '麵食': [/麵(?!包)/, '水餃', '煎餃', '餛飩'], '小吃': ['小吃', '夜市', '滷肉飯', '肉圓'] };
+      const has = w => w instanceof RegExp ? w.test(text) : text.toLowerCase().includes(String(w).toLowerCase());
+      const pick = f.options.filter(o => (syn[o] || [o]).some(has));
       if (pick.length) { d.values[f.id] = pick; filled.push(f.name); }
     } else if (f.type === 'single' && f.id === 'status') d.values[f.id] = f.options[0];
   });
-  d.note = summarize(text); if (d.note) filled.push('重點');
+  d.note = fullNote(text); if (d.note) filled.push('重點');
   const fromImg = input.ocr && addr && !String(input.caption || '').replace(/\s+/g, '').includes(addr);
   d.why = '出現「' + r.hit.slice(0, 4).join('、') + '」' + (fromImg ? ';地址從截圖辨識' : '') + (filled.length ? '。已自動填:' + filled.join('、') : '');
   return d;
@@ -274,7 +279,7 @@ async function runOcr(images, onProgress) {
 function toast(m) { let t = document.querySelector('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); } t.textContent = m; clearTimeout(toast.t); toast.t = setTimeout(() => t.remove(), 2000); }
 async function saveCats() { await store.setMeta('cats', CATS); }
 async function saveSet() { await store.setMeta('settings', SET); }
-function titleOf(it) { return (it.values && it.values.name) || (it.note ? it.note.slice(0, 18) : '') || ((it.platform || '連結') + (it.kind ? ' ' + it.kind : '') + ' · 內容待補'); }
+function titleOf(it) { return (it.values && it.values.name) || (it.note ? it.note.split('\n')[0].slice(0, 18) : '') || ((it.platform || '連結') + (it.kind ? ' ' + it.kind : '') + ' · 內容待補'); }
 function itemText(it) { const c = cat(it.cat); const v = Object.values(it.values || {}).map(x => Array.isArray(x) ? x.join(' ') : x).join(' '); return [v, it.note, it.platform, c ? c.name : ''].join(' ').toLowerCase(); }
 function isDone(it) { const sf = statusField(it); return !!(sf && it.values && it.values.status === sf.options[sf.options.length - 1]); }
 function areaOf(it) {
@@ -1227,7 +1232,7 @@ async function pasteShared() {
 (async function start() {
   await store.open();
   CATS = (await store.getMeta('cats')) || defaultCats();
-  const food = CATS.find(c => c.id === 'food'); const kf = food && food.fields.find(f => f.id === 'kind'); if (kf && !kf.options.includes('泰式')) kf.options.push('泰式');
+  const food = CATS.find(c => c.id === 'food'); const kf = food && food.fields.find(f => f.id === 'kind'); if (kf && !kf.options.includes('泰式')) kf.options.push('泰式'); if (kf && !kf.options.includes('麵食')) kf.options.push('麵食');
   SET = Object.assign({ askWhenUnsure: false, keyMode: 'builtin', ownKey: '', gcap: 150, gphoto: true }, (await store.getMeta('settings')) || {});
   if (!SET.autoCatV) { SET.askWhenUnsure = false; SET.autoCatV = 1; await saveSet(); }
   GU = (await store.getMeta('gusage')) || null;
