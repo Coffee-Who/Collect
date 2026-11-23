@@ -1069,8 +1069,11 @@ function cleanShared(t) {
 }
 function incoming() {
   const p = new URLSearchParams(location.search);
-  const text = cleanShared([p.get('title'), p.get('text')].filter(Boolean).join('\n'));
-  const url = p.get('url') || firstUrl(text);
+  let pu = p.get('url') || '', pt = p.get('text') || '';
+  /* 捷徑裡兩個變數放反也沒關係:哪個是連結就當連結 */
+  if (pu && !/^https?:\/\//i.test(pu.trim()) && /^https?:\/\//i.test(pt.trim())) { const t = pu; pu = pt; pt = t; }
+  const text = cleanShared([p.get('title'), pt].filter(Boolean).join('\n'));
+  const url = pu.trim() || firstUrl(text);
   if (!url && !text) return;
   S.autoSave = p.get('auto') === '1';
   history.replaceState(null, '', location.pathname);
