@@ -189,13 +189,18 @@ function nameBeforeAddress(t) {
     cand = cand.replace(/^[a-z0-9._]{5,30}\s+/, '').trim(); /* 開頭的 IG 帳號 */
     if (!/[\u4e00-\u9fff]{2}|[A-Za-z]{3}/.test(cand)) cand = '';
     const PRICE = /\d+\s*(元|塊)|\$\s*\d|NT\$?|\d{3,}/i;
-    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand) && !PRICE.test(cand)) return cand;
+    if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand) && !PRICE.test(cand) && !(cand.length > 6 && /的|都|很|也|還|了|位於|旁|裡|引人/.test(cand))) return cand;
     /* 地址上一行是菜單或價錢:往前找像店名的那行(有「店、所、館、cafe、Table…」) */
     const STORE = /(店|所|館|屋|堂|坊|廳|茶樓|商行|食堂|酒場|cafe|café|coffee|bar|kitchen|table|bistro|brunch|bakery|restaurant|diner)/i;
     for (let k = 0; k < i; k++) {
-      let x = lines[k].replace(/[#＃]\S*/g, ' ').replace(/[@＠]\S*/g, ' ').replace(/^[a-z0-9._]{5,30}\s+/, '').replace(/[*＊~～✨]+/g, '').replace(/\s+/g, ' ').trim();
-      if (!x || x.length > 25 || !STORE.test(x) || PRICE.test(x) || /地址|營業|時間|電話|推薦|這家|附近|新開|[!！?？,，。]/.test(x)) continue;
+      let x = lines[k].replace(/[#＃]([A-Za-z][\w'’&.-]*)/g, '$1').replace(/[#＃]\S*/g, ' ').replace(/[@＠]\S*/g, ' ').replace(/^[a-z0-9._]{5,30}\s+/, '').replace(/[*＊~～✨]+/g, '').replace(/\s+/g, ' ').trim();
+      if (!x || x.length > 25 || !STORE.test(x) || PRICE.test(x) || /地址|營業|時間|電話|推薦|這家|附近|新開|位於|旁的|巷弄|這裡|我們|[!！?？,，。、]/.test(x)) continue;
       return x;
+    }
+    /* 最後:地址附近的 @店家帳號,例如 @litty_coffee → Litty Coffee */
+    for (let k = i - 1; k >= Math.max(0, i - 3); k--) {
+      const h = lines[k].match(/^[@＠]([A-Za-z0-9._]{3,30})$/);
+      if (h) return h[1].replace(/[._]+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
     }
   }
   return '';
@@ -682,15 +687,16 @@ function vary(id, n) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.
 /* IG 官方預覽:切掉上方帳號列和下方按讚列,只留影片/照片 */
 const IG_TOP = 62; /* 帳號列高度(預覽框寬 340 時) */
 function isIgEmbed(it) { return /instagram\.com/.test(embedUrl(it.url) || ''); }
-function pinRatio(it) {
+function pinRatio(it, big) {
+  if (big && isIgEmbed(it) && !coverImg(it)) return it.kind === 'Reel' ? 1.6 : 1.25;
   const img = coverImg(it);
   if (img) return Math.min(1.6, Math.max(0.7, img.h / img.w));
-  if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [0.85, 0.92][vary(it.id, 2)];
+  if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [1, 1.15, 1.25][vary(it.id, 3)];
   if (embedUrl(it.url)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
 }
 function visualHTML(it, big) {
-  const img = coverImg(it); const c = cat(it.cat); const emb = !img && embedUrl(it.url); const r = pinRatio(it);
+  const img = coverImg(it); const c = cat(it.cat); const emb = !img && embedUrl(it.url); const r = pinRatio(it, big);
   const attrs = big ? '' : `data-a="open" data-id="${it.id}" data-lp="${it.id}" role="button" tabindex="0" aria-label="查看 ${esc(titleOf(it))}"`;
   const src = it.platform ? `<span class="src">${esc(it.platform)}</span>` : '';
   if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
@@ -1182,7 +1188,7 @@ function stripChrome(t) {
     if (/^[^一-鿿A-Za-z0-9]+$/.test(x)) continue; /* 只有符號 */
     /* 截圖辨識會照畫面寬度斷行:上一行很長又沒有句尾標點,就接回去 */
     const prev = out[out.length - 1];
-    if (prev && lastRaw >= 18 && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && !/^.{0,1}(地址|住址|營業時間|營業|時間|電話|店名|店家資訊|店家|價位|預約|公休|休息)[:：]?/.test(x) && /^[\u4e00-\u9fffA-Za-z0-9「『(（]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
+    if (prev && lastRaw >= 18 && !/[#＃@＠]/.test(prev) && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && !/^.{0,1}(地址|住址|營業時間|營業|時間|電話|店名|店家資訊|店家|價位|預約|公休|休息)[:：]?/.test(x) && /^[\u4e00-\u9fffA-Za-z0-9「『(（]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
     out.push(x); lastRaw = raw.length;
   }
   /* 說明從「帳號名 + 文字」那行開始,前面多半是影片字幕,去掉 */
