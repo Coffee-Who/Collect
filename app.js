@@ -205,7 +205,7 @@ function extractName(t, c) {
 }
 /* 重點:保留完整說明(去掉只有 #標籤 的行),最多 1500 字 */
 function fullNote(t) {
-  return t.split(/\n/).map(x => x.trim()).filter(x => x && !/^(#\S+\s*)+$/.test(x)).join('\n').slice(0, 1500);
+  return t.split(/\n/).map(x => x.trim()).filter(x => x && !/^([#＃]\s*\S+\s*)+$/.test(x)).join('\n').slice(0, 1500);
 }
 function summarize(t) {
   const parts = t.replace(/#\S+/g, '').split(/[。!!??\n]/).map(s => s.trim()).filter(s => s.length > 6);
@@ -1116,7 +1116,7 @@ function cleanShared(t) {
   if (!t) return '';
   const ta = document.createElement('textarea'); ta.innerHTML = t; t = ta.value;
   t = t.replace(/\uFFFD/g, '');
-  t = t.replace(/^\s*[a-z0-9._]{3,30}\s+(?=[^\x00-\x7f])/im, ''); /* 開頭的 IG 帳號名 */
+  t = t.replace(/^\s*[a-z0-9._]{3,30}\s*(?=[\u4e00-\u9fff])/m, ''); /* 開頭的 IG 帳號名(小寫英數,可能沒空格) */
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
 }
@@ -1140,7 +1140,29 @@ async function fetchIgCaption(url) {
 }
 const IG_CHROME = /^(Instagram|Instagram Lite|Threads|Meta|Meta AI|Meta Verified|關於|說明|API|工作機會|隱私政策|隱私|使用條款|地點|語言|中文\(台灣\)|聯絡人上傳和非用戶|上傳聯絡人和非用戶|登入|註冊|Log in|Sign up|About|Help|Jobs|Privacy|Terms|Locations|Language|查看更多|View more|More|更多|讚|則留言|分享|收藏|追蹤|追蹤中|Follow|Following|原始音訊|•|·|[\d:：\s,.萬KkMm]+|©.*Meta.*|.*from Meta)$/i;
 /* 去掉 IG 介面文字(讚數、時間、選單字),截圖辨識或網頁轉文字時用 */
-function stripChrome(t) { return (t || '').split(/\n/).map(x => x.trim()).filter(x => x && !IG_CHROME.test(x)).join('\n'); }
+function stripChrome(t) {
+  const CITY = /^(台北|臺北|新北|桃園|台中|臺中|台南|臺南|高雄|新竹|基隆|嘉義|宜蘭|花蓮|屏東|彰化|南投|雲林|苗栗|台東|臺東|澎湖|金門)[市縣]/;
+  const out = []; let lastRaw = 0;
+  for (let x of (t || '').split(/\n/)) {
+    x = x.trim(); if (!x) continue; const raw = x;
+    /* 貼文日期之後是下一篇貼文,後面都不要 */
+    if (/^\d{1,2}\s*月\s*\d{1,2}\s*日$|^\d{4}\s*年|^\d+\s*(天|小時|分鐘|週|周)前$|^\d+\s*(days?|hours?|weeks?)\s*ago$/i.test(x)) break;
+    /* 表情符號被辨識成怪字:去掉行首的符號、單一字母(📍→Y)、地址前多出的一個字(🏠→血) */
+    x = x.replace(/^[^一-鿿A-Za-z0-9「『(（#＃@＠]+/, '').replace(/^[A-Za-z]\s+(?=\S{2,})/, '').trim();
+    if (x.length > 3 && CITY.test(x.slice(1)) && !CITY.test(x)) x = x.slice(1);
+    x = x.replace(/[\s・•·]+$/, '').trim();
+    if (!x || IG_CHROME.test(x)) continue;
+    if (/^(已儲存|已收藏|追蹤中|追蹤|返回|Reels?|貼文|快拍|留言|音樂|原始音訊|翻譯年糕|查看翻譯)$/.test(x)) continue;
+    if (/[֐-ۿ]/.test(x) && x.replace(/[֐-ۿ\d\s.,]/g, '').length < 3) continue; /* 阿拉伯文雜訊 */
+    if (/^[\d\s.,萬千KkMm]+$/.test(x.replace(/[^\d\s.,萬千KkMm]/g, '')) && x.replace(/[\d\s.,萬千KkMm]/g, '').length <= 2) continue; /* 2.6萬、911 這類數字 */
+    if (/^[^一-鿿A-Za-z0-9]+$/.test(x)) continue; /* 只有符號 */
+    /* 截圖辨識會照畫面寬度斷行:上一行很長又沒有句尾標點,就接回去 */
+    const prev = out[out.length - 1];
+    if (prev && lastRaw >= 18 && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && !/^[#＃※]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
+    out.push(x); lastRaw = raw.length;
+  }
+  return out.join('\n');
+}
 function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
 function captionFromHtml(h) {
   const metas = h.match(/<meta\b[^>]*>/gi) || [];
