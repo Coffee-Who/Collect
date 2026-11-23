@@ -1,0 +1,23 @@
+name: Sign iOS Shortcut
+on:
+  push:
+    paths: ['shortcut/unsigned.shortcut', '.github/workflows/sign-shortcut.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sign:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign
+        run: |
+          shortcuts sign --mode anyone --input shortcut/unsigned.shortcut --output "shortcut/存到收藏.shortcut"
+          ls -la shortcut
+      - name: Commit signed file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add shortcut
+          git commit -m "Signed shortcut" || echo "no change"
+          git push
