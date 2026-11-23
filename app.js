@@ -1060,6 +1060,7 @@ function incoming() {
   const text = [p.get('title'), p.get('text')].filter(Boolean).join('\n');
   const url = p.get('url') || firstUrl(text);
   if (!url && !text) return;
+  S.autoSave = p.get('auto') === '1';
   history.replaceState(null, '', location.pathname);
   S.add = { url: url || '', caption: text.replace(url || '', '').trim(), images: [] };
   S.view = 'add';
@@ -1082,7 +1083,7 @@ function incoming() {
   await applySampleGeo();
   render();
   setTimeout(geoQueue, 1500);
-  if (fromShare) act('analyze', {});
+  if (fromShare) { await act('analyze', {}); if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; await act('save', {}); } }
   if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(() => {}); }
 })();
 })();
