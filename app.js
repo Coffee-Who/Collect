@@ -182,10 +182,10 @@ function nameBeforeAddress(t) {
   const re = /(?:台北|臺北|新北|桃園|台中|臺中|台南|臺南|高雄|新竹|基隆|嘉義|宜蘭|花蓮|屏東|彰化|南投|雲林|苗栗|台東|臺東|澎湖|金門)[市縣]/;
   for (let i = 0; i < lines.length; i++) {
     if (!re.test(lines[i])) continue;
-    const before = lines[i].split(re)[0].replace(/[::\-—|｜]+$/, '').trim();
+    const before = lines[i].split(re)[0].replace(/(地址|住址)?[:：\-—|｜\s]*$/, '').trim();
     let j = i - 1; while (j >= 0 && /^[@#＠＃]/.test(lines[j])) j--; /* 跳過 @帳號、#標籤 行 */
     let cand = before.length >= 2 ? before : (lines[j] || '');
-    cand = cand.split(/[|｜/／]/)[0].replace(/^[@#＠＃]|[@#＠＃].*$/g, '').replace(/^(店名|店家|地址)[::]?/, '').trim();
+    cand = (cand.split(/[|｜/／]/).map(x => x.trim()).find(x => x && !/^(店家|店名|餐廳|店舖)?(資訊|資料|名稱|介紹)$|^(店家|店名)$/.test(x)) || '').replace(/^[@#＠＃]|[@#＠＃].*$/g, '').replace(/^(店名|店家|地址)[:：]?/, '').trim();
     if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
   }
   return '';
@@ -1151,6 +1151,7 @@ function stripChrome(t) {
     /* 表情符號被辨識成怪字:去掉行首的符號、單一字母(📍→Y)、地址前多出的一個字(🏠→血) */
     x = x.replace(/^[^一-鿿A-Za-z0-9「『(（#＃@＠]+/, '').replace(/^[A-Za-z]\s+(?=\S{2,})/, '').trim();
     if (x.length > 3 && CITY.test(x.slice(1)) && !CITY.test(x)) x = x.slice(1);
+    x = x.replace(/^[^\s](?=(地址|住址|營業時間|營業|時間|電話|店名|店家資訊|店家|價位|預約|公休|休息)[:：])/, ''); /* 🏠 被讀成「會」這類 */
     x = x.replace(/[\s・•·]+$/, '').trim();
     if (!x || IG_CHROME.test(x)) continue;
     if (/^(已儲存|已收藏|追蹤中|追蹤|返回|Reels?|貼文|快拍|留言|音樂|原始音訊|翻譯年糕|查看翻譯)$/.test(x)) continue;
@@ -1159,7 +1160,7 @@ function stripChrome(t) {
     if (/^[^一-鿿A-Za-z0-9]+$/.test(x)) continue; /* 只有符號 */
     /* 截圖辨識會照畫面寬度斷行:上一行很長又沒有句尾標點,就接回去 */
     const prev = out[out.length - 1];
-    if (prev && lastRaw >= 18 && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && /^[\u4e00-\u9fffA-Za-z0-9「『(（]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
+    if (prev && lastRaw >= 18 && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && !/^.{0,1}(地址|住址|營業時間|營業|時間|電話|店名|店家資訊|店家|價位|預約|公休|休息)[:：]?/.test(x) && /^[\u4e00-\u9fffA-Za-z0-9「『(（]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
     out.push(x); lastRaw = raw.length;
   }
   /* 說明從「帳號名 + 文字」那行開始,前面多半是影片字幕,去掉 */
