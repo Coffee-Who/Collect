@@ -183,9 +183,9 @@ function nameBeforeAddress(t) {
   for (let i = 0; i < lines.length; i++) {
     if (!re.test(lines[i])) continue;
     const before = lines[i].split(re)[0].replace(/[::\-—|｜]+$/, '').trim();
-    let j = i - 1; while (j >= 0 && /^[@#]/.test(lines[j])) j--; /* 跳過 @帳號、#標籤 行 */
+    let j = i - 1; while (j >= 0 && /^[@#＠＃]/.test(lines[j])) j--; /* 跳過 @帳號、#標籤 行 */
     let cand = before.length >= 2 ? before : (lines[j] || '');
-    cand = cand.split(/[|｜/／]/)[0].replace(/^[@#]|[@#].*$/g, '').replace(/^(店名|店家|地址)[::]?/, '').trim();
+    cand = cand.split(/[|｜/／]/)[0].replace(/^[@#＠＃]|[@#＠＃].*$/g, '').replace(/^(店名|店家|地址)[::]?/, '').trim();
     if (cand.length >= 2 && cand.length <= 30 && !/地址|營業|時間|電話|[!！?？]|。$/.test(cand) && !/^[\d\s:：-]+$/.test(cand)) return cand;
   }
   return '';
@@ -1145,6 +1145,7 @@ function stripChrome(t) {
   const out = []; let lastRaw = 0;
   for (let x of (t || '').split(/\n/)) {
     x = x.trim(); if (!x) continue; const raw = x;
+    if (/說讚|都說讚|liked by/i.test(x)) continue;
     /* 貼文日期之後是下一篇貼文,後面都不要 */
     if (/^\d{1,2}\s*月\s*\d{1,2}\s*日$|^\d{4}\s*年|^\d+\s*(天|小時|分鐘|週|周)前$|^\d+\s*(days?|hours?|weeks?)\s*ago$/i.test(x)) break;
     /* 表情符號被辨識成怪字:去掉行首的符號、單一字母(📍→Y)、地址前多出的一個字(🏠→血) */
@@ -1154,14 +1155,16 @@ function stripChrome(t) {
     if (!x || IG_CHROME.test(x)) continue;
     if (/^(已儲存|已收藏|追蹤中|追蹤|返回|Reels?|貼文|快拍|留言|音樂|原始音訊|翻譯年糕|查看翻譯)$/.test(x)) continue;
     if (/[֐-ۿ]/.test(x) && x.replace(/[֐-ۿ\d\s.,]/g, '').length < 3) continue; /* 阿拉伯文雜訊 */
-    if (/^[\d\s.,萬千KkMm]+$/.test(x.replace(/[^\d\s.,萬千KkMm]/g, '')) && x.replace(/[\d\s.,萬千KkMm]/g, '').length <= 2) continue; /* 2.6萬、911 這類數字 */
+    if (!/\d{2,4}-\d{3,4}-?\d{3,4}/.test(x) && /^[\d\s.,萬千KkMm]+$/.test(x.replace(/[^\d\s.,萬千KkMm]/g, '')) && x.replace(/[\d\s.,萬千KkMm]/g, '').length <= 2) continue; /* 2.6萬、911 這類數字 */
     if (/^[^一-鿿A-Za-z0-9]+$/.test(x)) continue; /* 只有符號 */
     /* 截圖辨識會照畫面寬度斷行:上一行很長又沒有句尾標點,就接回去 */
     const prev = out[out.length - 1];
-    if (prev && lastRaw >= 18 && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && !/^[#＃※]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
+    if (prev && lastRaw >= 18 && !/[。.!！?？:：)）」』~～]$/.test(prev) && !CITY.test(x) && /^[\u4e00-\u9fffA-Za-z0-9「『(（]/.test(raw)) { out[out.length - 1] = prev + x; lastRaw = raw.length; continue; }
     out.push(x); lastRaw = raw.length;
   }
-  return out.join('\n');
+  /* 說明從「帳號名 + 文字」那行開始,前面多半是影片字幕,去掉 */
+  const start = out.findIndex(l => /^[a-z0-9._]{3,30}\s*(?=[\u4e00-\u9fff])/.test(l));
+  return (start > 0 ? out.slice(start) : out).join('\n');
 }
 function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
 function captionFromHtml(h) {
