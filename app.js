@@ -690,6 +690,7 @@ function vDetail() {
       ${it.note ? `<p class="dnote">${esc(it.note)}</p>` : '<p class="note">還沒有重點,按下面「編輯」補上。</p>'}
       ${rows ? `<div>${rows}</div>` : ''}
       ${locBlockHTML(it)}
+      ${igCode(it.url) && !(it.note || '').trim() ? `<button class="linkbtn" data-a="igread" data-id="${it.id}">讀取 IG 說明並重新分類</button>` : ''}
       <button class="linkbtn" data-a="edit" data-id="${it.id}">編輯重點與分類</button>
     </div>
     ${more.length ? `<h2 class="dmore">更多${esc(c ? c.name : '')}</h2>${wallOf(more)}` : '<div style="height:60px"></div>'}
@@ -890,6 +891,14 @@ async function act(a, ds) {
     case 'closesearch': S.searching = false; S.q = ''; render(); break;
     case 'cats': go('cats'); break;
     case 'pasteshared': pasteShared(); break;
+    case 'igread': {
+      const it = ITEMS.find(i => i.id === ds.id); if (!it) break;
+      toast('讀取 IG 說明中…'); const c = await fetchIgCaption(it.url);
+      if (!c) { toast('這次沒讀到,IG 可能暫時擋住了'); break; }
+      const d = analyze({ url: it.url, caption: cleanShared(c), ocr: '', images: it.images || [] });
+      Object.assign(d, { id: it.id, at: it.at, images: it.images, state: 'done', _loc: it.values.loc || '' }); if (it.geo) d.geo = it.geo; if (it.sample) d.sample = true;
+      S.draft = d; go('confirm'); toast('已讀到說明,確認後按存'); break;
+    }
     case 'new': S.add = { url: '', caption: '', images: [] }; go('add'); break;
     case 'paste': try { const t = await navigator.clipboard.readText(); const u = firstUrl(t); if (u) { S.add.url = u; if (t.trim() !== u) S.add.caption = S.add.caption || t.replace(u, '').trim(); if (!S.add.images.length) { act('analyze', {}); } else render(); } else toast('剪貼簿裡沒有連結'); } catch (err) { const el = $('#url'); if (el) el.focus(); toast('請長按輸入框選「貼上」'); } break;
     case 'rmshot': S.add.images.splice(+ds.i, 1); render(); break;
@@ -902,6 +911,7 @@ async function act(a, ds) {
         catch (err) { toast('文字辨識失敗,先用說明文字判斷'); }
       }
       let cap = ad.caption; let ytAuthor = '';
+      if (!cap.trim() && igCode(ad.url)) { S.busy = '讀取 IG 說明…'; render(); const c = await fetchIgCaption(ad.url); if (c) { cap = cleanShared(c); toast('已讀到 IG 說明'); } }
       if (ytId(ad.url)) { S.busy = '讀取 YouTube 標題…'; render(); const info = await ytTitle(ad.url); if (info) { cap = [info.title, cap].filter(Boolean).join('\n'); ytAuthor = info.author; } }
       const imgs = ad.images.length ? ad.images.slice(0, 1) : (ytThumb(ad.url) ? [ytThumb(ad.url)] : []);
       S.busy = ''; S.draft = analyze({ url: ad.url, caption: cap, ocr, images: imgs });
@@ -1082,6 +1092,27 @@ function cleanShared(t) {
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
 }
+/* ---------- 讀 IG 說明:透過公開的轉接服務抓 IG 嵌入頁(不用登入的那一頁) ---------- */
+function igCode(u) { const m = (u || '').match(/instagram\.com\/(p|reel|reels|tv)\/([\w-]+)/i); return m ? { type: m[1].toLowerCase() === 'reels' ? 'reel' : m[1].toLowerCase(), code: m[2] } : null; }
+const IG_PROXIES = [
+  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u)
+];
+async function fetchIgCaption(url) {
+  const ig = igCode(url); if (!ig) return '';
+  const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
+  for (const mk of IG_PROXIES) {
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const r = await fetch(mk(embed), { signal: ctl.signal }); clearTimeout(tm);
+      if (!r.ok) continue;
+      const h = await r.text(); const cap = captionFromHtml(h);
+      if (cap && cap.replace(/\s/g, '').length >= 6 && !/Afrikaans|Meta 驗證|Meta Verified/.test(cap)) return cap;
+    } catch (e) { clearTimeout(tm); }
+  }
+  return '';
+}
 function decodeHtml(x) { const ta = document.createElement('textarea'); ta.innerHTML = x; return ta.value; }
 function captionFromHtml(h) {
   const metas = h.match(/<meta\b[^>]*>/gi) || [];
@@ -1163,7 +1194,7 @@ async function pasteShared() {
     S.autoSave = true; S.add = { url: normalizeUrl(u), caption: cleanShared(body), images: [] }; S.view = 'add'; await runShared(); return;
   }
   if (loginPage) { setTimeout(() => toast('IG 只回了登入頁,沒有貼文內容,先只存連結'), 600); S.autoSave = true; S.add = { url: normalizeUrl(u), caption: '', images: [] }; S.view = 'add'; await runShared(); return; }
-  S.autoSave = false; S.add = { url: u, caption: t.replace(u, '').trim(), images: [] }; await act('analyze', {});
+  S.autoSave = true; S.add = { url: u, caption: t.replace(u, '').trim(), images: [] }; S.view = 'add'; await runShared();
 }
 
 /* ---------- 啟動 ---------- */
