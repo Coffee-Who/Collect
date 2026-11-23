@@ -826,6 +826,13 @@ app.addEventListener('input', e => {
   if (m === 'draft.url') { S.draft.url = val; return; }
   if (m === 'cat.name') { S.editCat.name = val; }
 });
+/* 在連結欄長按貼上:有連結就直接進下一步 */
+app.addEventListener('paste', e => {
+  if (!e.target || e.target.id !== 'url' || S.view !== 'add') return;
+  const t = (e.clipboardData && e.clipboardData.getData('text')) || ''; const u = firstUrl(t); if (!u) return;
+  e.preventDefault(); S.add.url = u; if (t.trim() !== u) S.add.caption = S.add.caption || t.replace(u, '').trim();
+  if (!S.add.images.length) act('analyze', {}); else render();
+});
 app.addEventListener('change', async e => {
   const a = e.target.dataset.a;
   if (a === 'files') {
@@ -865,7 +872,7 @@ async function act(a, ds) {
     case 'closesearch': S.searching = false; S.q = ''; render(); break;
     case 'cats': go('cats'); break;
     case 'new': S.add = { url: '', caption: '', images: [] }; go('add'); break;
-    case 'paste': try { const t = await navigator.clipboard.readText(); const u = firstUrl(t); if (u) { S.add.url = u; if (t.trim() !== u) S.add.caption = S.add.caption || t.replace(u, '').trim(); render(); } else toast('剪貼簿裡沒有連結'); } catch (err) { const el = $('#url'); if (el) el.focus(); toast('請長按輸入框選「貼上」'); } break;
+    case 'paste': try { const t = await navigator.clipboard.readText(); const u = firstUrl(t); if (u) { S.add.url = u; if (t.trim() !== u) S.add.caption = S.add.caption || t.replace(u, '').trim(); if (!S.add.images.length) { act('analyze', {}); } else render(); } else toast('剪貼簿裡沒有連結'); } catch (err) { const el = $('#url'); if (el) el.focus(); toast('請長按輸入框選「貼上」'); } break;
     case 'rmshot': S.add.images.splice(+ds.i, 1); render(); break;
     case 'analyze': {
       const ad = S.add; ad.url = normalizeUrl(ad.url || firstUrl(ad.caption));
