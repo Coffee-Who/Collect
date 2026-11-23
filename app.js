@@ -1094,6 +1094,7 @@ async function importFile(f) {
 function cleanShared(t) {
   if (!t) return '';
   const ta = document.createElement('textarea'); ta.innerHTML = t; t = ta.value;
+  t = t.replace(/\uFFFD/g, '');
   t = t.replace(/^\s*[a-z0-9._]{3,30}\s+(?=[^\x00-\x7f])/im, ''); /* 開頭的 IG 帳號名 */
   t = t.replace(/^[^\n]{0,160}?(likes?|個讚|comments?|則留言)[^\n]{0,160}?[:：]\s*["“「]/i, '').replace(/["”」]\s*\.?\s*$/, '');
   return t.trim();
