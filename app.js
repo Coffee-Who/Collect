@@ -1136,6 +1136,7 @@ async function pasteShared() {
     try { t = await navigator.clipboard.readText(); } catch (e2) { toast('沒有讀到剪貼簿,請再按一次並點「貼上」'); return; }
   }
   t = (t || '').trim(); if (!t) { toast('剪貼簿是空的'); return; }
+  t = t.replace(/(instagram\.com\/(?:p|reel|reels|tv)\/[\w-]+\/)embed(?:\/captioned)?\/?/gi, '$1'); /* 嵌入頁網址換回原貼文網址 */
   /* 捷徑把「連結 + 整個網頁」拷貝過來:從網頁裡找貼文說明 */
   if (/<(meta|html|!doctype)/i.test(t)) {
     const u = firstUrl(t.split('<')[0]) || firstUrl(t) || '';
