@@ -1196,7 +1196,8 @@ function captionFromHtml(h) {
   return '';
 }
 function incoming(search) {
-  const p = new URLSearchParams(search == null ? location.search : search);
+  /* 參數可以放在 ? 或 #:圖片很長時要用 #,才不會被伺服器拒絕(URI Too Long) */
+  const p = new URLSearchParams(search == null ? (location.search.slice(1) + '&' + location.hash.slice(1)) : String(search).replace(/^[?#]/, ''));
   let pu = p.get('url') || '', pt = p.get('text') || '';
   /* 捷徑裡兩個變數放反也沒關係:哪個是連結就當連結 */
   if (pu && !/^https?:\/\//i.test(pu.trim()) && /^https?:\/\//i.test(pt.trim())) { const t = pu; pu = pt; pt = t; }
@@ -1254,7 +1255,7 @@ async function pasteShared() {
     S.autoSave = true; S.add = { url: normalizeUrl(u), caption: cleanShared(cap || ''), images: [] }; S.view = 'add';
     await runShared(); return;
   }
-  const m = t.match(/coffee-who\.github\.io\/Collect\/?(\?\S*)/i);
+  const m = t.match(/coffee-who\.github\.io\/Collect\/?([?#]\S*)/i);
   if (m) { if (incoming(m[1])) await runShared(); else toast('剪貼簿裡沒有連結'); return; }
   const u = firstUrl(t);
   if (!u) {
@@ -1291,6 +1292,11 @@ async function pasteShared() {
   render();
   setTimeout(geoQueue, 1500);
   if (fromShare) await runShared();
+  /* 頁面已經開著時,只改 # 不會重新載入:監聽 hashchange 照樣處理 */
+  window.addEventListener('hashchange', async () => {
+    if (!/(^|[#&])(text|url|img)=/.test(location.hash)) return;
+    if (incoming() !== undefined && S.view === 'add') await runShared();
+  });
   if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(() => {}); }
 })();
 })();
