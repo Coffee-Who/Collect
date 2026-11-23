@@ -259,7 +259,7 @@ function statusField(it) { const c = cat(it.cat); return c ? c.fields.find(f => 
 /* =====================================================================
    地點與 Google 地圖(從口袋景點移植並改寫)
    ===================================================================== */
-const BUILTIN_KEY = ''; /* 上線前填入你的金鑰,並在 Google Cloud 限制只允許 coffee-who.github.io 使用 */
+const BUILTIN_KEY = 'AIzaSyBvbz07UEwVw7K3tI4JcLcW2tXkqf_bksw'; /* 上線前填入你的金鑰,並在 Google Cloud 限制只允許 coffee-who.github.io 使用 */
 const DEMO_POS = { lat: 24.1620, lng: 120.6460, demo: true }; /* 無法定位時的示範位置(台中西屯) */
 const G_KINDS = [
   { k: 'mapsjs', label: '地圖顯示', cap: 10000 },
@@ -602,9 +602,13 @@ function wallHTML() {
 }
 /* 讓每格高度不一樣:依 id 算出固定的變化,重新整理也不會跳動 */
 function vary(id, n) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % n; }
+/* IG 官方預覽:切掉上方帳號列和下方按讚列,只留影片/照片 */
+const IG_TOP = 70;
+function isIgEmbed(it) { return /instagram\.com/.test(embedUrl(it.url) || ''); }
 function pinRatio(it) {
   const img = firstImg(it);
   if (img) return Math.min(1.6, Math.max(0.7, img.h / img.w));
+  if (isIgEmbed(it)) return it.kind === 'Reel' ? 1.25 : 1;
   if (embedUrl(it.url)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
 }
@@ -613,7 +617,7 @@ function visualHTML(it, big) {
   const attrs = big ? '' : `data-a="open" data-id="${it.id}" data-lp="${it.id}" role="button" tabindex="0" aria-label="查看 ${esc(titleOf(it))}"`;
   const src = it.platform ? `<span class="src">${esc(it.platform)}</span>` : '';
   if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
-  if (emb) return `<div class="embed" ${attrs} style="aspect-ratio:1/${r}"><div class="efall"><span class="s">${esc([it.platform, it.kind].filter(Boolean).join(' '))} · 預覽載入中</span><span class="t">${esc(titleOf(it))}</span></div><iframe src="${esc(emb)}" style="height:${Math.round(340 * r)}px" loading="lazy" title="${esc(it.platform)} 官方預覽" scrolling="no" tabindex="-1"></iframe><span class="cover"></span>${big ? '' : src}</div>`;
+  if (emb) return `<div class="embed${isIgEmbed(it) ? ' ig' : ''}" ${attrs} style="aspect-ratio:1/${r}"><div class="efall"><span class="s">${esc([it.platform, it.kind].filter(Boolean).join(' '))} · 預覽載入中</span><span class="t">${esc(titleOf(it))}</span></div><iframe src="${esc(emb)}" ${isIgEmbed(it) ? `data-crop="${IG_TOP}"` : ''} style="height:${Math.round(340 * r) + (isIgEmbed(it) ? IG_TOP + 260 : 0)}px" loading="lazy" title="${esc(it.platform)} 官方預覽" scrolling="no" tabindex="-1"></iframe><span class="cover"></span>${big ? '' : src}</div>`;
   return `<div class="textpin" ${attrs} style="aspect-ratio:1/${r}"><span class="s">${esc([it.platform, c ? c.name : ''].filter(Boolean).join(' · '))}</span><span class="t">${esc(titleOf(it))}</span></div>`;
 }
 function pinHTML(it) {
@@ -783,7 +787,7 @@ function render() {
   if (S.view === 'confirm') attachAutocomplete();
 }
 function fitEmbeds() {
-  app.querySelectorAll('.embed').forEach(el => { const f = el.querySelector('iframe'); if (f) f.style.transform = 'scale(' + (el.clientWidth / 340) + ')'; });
+  app.querySelectorAll('.embed').forEach(el => { const f = el.querySelector('iframe'); if (f) { const k = el.clientWidth / 340, c = +(f.dataset.crop || 0); f.style.transform = 'translateY(' + (-c * k) + 'px) scale(' + k + ')'; } });
 }
 window.addEventListener('resize', fitEmbeds);
 /* 嵌入框被擋(例如預覽環境)時,改顯示文字卡 */

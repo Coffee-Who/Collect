@@ -18,7 +18,7 @@
 1. 在 GitHub 新增一個 repo,例如 `clipbox`。
 2. 把這個資料夾裡的所有檔案上傳到 repo 根目錄。
 3. repo 的 Settings → Pages → Source 選 `main` 分支、`/ (root)`,儲存。
-4. 一兩分鐘後網址會是 `https://coffee-who.github.io/Collect/`。
+4. 一兩分鐘後網址會是 `https://<你的帳號>.github.io/clipbox/`。
 
 ## 裝到 iPhone
 
@@ -33,7 +33,7 @@
 **iPhone(用捷徑)**:iOS 不讓網頁出現在分享選單,用「捷徑」App 代替:
 
 1. 打開「捷徑」→ 新增捷徑。
-2. 加入動作「URL」,內容填:`https://coffee-who.github.io/Collect/?url=`,後面接上變數「捷徑輸入」。
+2. 加入動作「URL」,內容填:`https://<你的帳號>.github.io/clipbox/?url=`,後面接上變數「捷徑輸入」。
 3. 再加入動作「打開 URL」。
 4. 捷徑設定裡開啟「在分享表單中顯示」,輸入類型選「URL」和「文字」。
 5. 命名為「存到收藏」。之後在 IG 按分享 → 「分享到…」→「存到收藏」。
