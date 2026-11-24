@@ -154,7 +154,7 @@ function platformOf(u) {
   if (s.includes('youtube.com') || s.includes('youtu.be')) return 'YT';
   return s ? '網頁' : '';
 }
-function embedOf(it) { return it && !it.noEmbed ? embedUrl(it.url) : ''; } /* 預覽壞掉的貼文(it.noEmbed)改顯示文字卡 */
+function embedOf(it) { return it && !it.noEmbed && SET.useEmbed ? embedUrl(it.url) : ''; } /* 預設不用官方預覽(影片會有播放箭頭),一律用照片 */ /* 預覽壞掉的貼文(it.noEmbed)改顯示文字卡 */
 function embedUrl(u) {
   const s = u || '';
   let m = s.match(/instagram\.com\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
@@ -1230,6 +1230,16 @@ async function fetchIgCover(url) {
     return await shrink(blob, 1000);
   } catch (e) { return null; }
 }
+/* 沒有照片的 IG 貼文:背景補抓封面圖,每筆只試一次 */
+async function fillCovers() {
+  for (const it of ITEMS.slice()) {
+    if (it.sample || it.coverTried || !igCode(it.url) || (it.images || []).some(x => x.data || x.url)) continue;
+    it.coverTried = true; const im = await fetchIgCover(it.url);
+    if (im) it.images = [im, ...(it.images || [])];
+    await store.putItem(it);
+    if (im && (S.view === 'feed' || S.view === 'detail')) render();
+  }
+}
 function incoming(search) {
   /* 參數可以放在 ? 或 #:圖片很長時要用 #,才不會被伺服器拒絕(URI Too Long) */
   const p = new URLSearchParams(search == null ? (location.search.slice(1) + '&' + location.hash.slice(1)) : String(search).replace(/^[?#]/, ''));
@@ -1334,6 +1344,7 @@ async function pasteShared() {
   await applySampleGeo();
   render();
   setTimeout(geoQueue, 1500);
+  setTimeout(fillCovers, 2500);
   if (fromShare) await runShared();
   /* 頁面已經開著時,只改 # 不會重新載入:監聽 hashchange 照樣處理 */
   window.addEventListener('hashchange', async () => {
