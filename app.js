@@ -704,7 +704,7 @@ const WALLIX = {};
 function pinRatio(it, big) {
   if (big && isIgEmbed(it) && !coverImg(it)) return it.kind === 'Reel' ? 1.6 : 1.25;
   const img = coverImg(it);
-  if (img) { const b = img.w && img.h ? Math.min(1.6, Math.max(0.7, img.h / img.w)) : 1; return big ? b : Math.min(1.8, Math.max(0.75, b * [0.78, 1.15, 0.92, 1.32][(WALLIX[it.id] || 0) % 4])); } /* 首頁依排列順序輪流變高矮,左右兩欄才會錯落;多出的部分裁切 */
+  if (img) { const b = img.w && img.h ? Math.min(1.6, Math.max(0.7, img.h / img.w)) : 1; return big ? b : Math.min(1.9, Math.max(0.75, b * [0.8, 1.35, 1.0, 1.6, 0.9, 1.2, 1.45][(WALLIX[it.id] || 0) % 7])); } /* 首頁依排列順序輪流變高矮,左右兩欄才會錯落;多出的部分裁切 */
   if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [1, 1.15, 1.25][vary(it.id, 3)];
   if (embedOf(it)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
