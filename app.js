@@ -855,7 +855,7 @@ function sheetHTML() {
         ${loc || (c && c.fields.some(f => f.type === 'location')) ? `<a class="act" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc || titleOf(it))}" target="_blank" rel="noopener">${I.pin}導航</a>` : '<span></span>'}
         ${sf ? `<button class="act" data-a="status" data-id="${it.id}">${I.check}改成${esc(nextSt)}</button>` : '<span></span>'}
       </div>
-      <div class="row" style="gap:18px;flex-wrap:wrap"><label class="linkbtn" style="cursor:pointer">${img ? '換照片' : '放自己的照片'}<input type="file" accept="image/*" class="sr" data-a="photo" data-id="${it.id}"></label>${embedUrl(it.url) && !img ? `<button class="linkbtn" data-a="toggleembed" data-id="${it.id}">${it.noEmbed ? '開啟官方預覽' : '預覽壞了?改用文字卡'}</button>` : ''}${img && embedOf(it) ? `<button class="linkbtn" data-a="rmphoto" data-id="${it.id}">改用官方預覽</button>` : ''}</div>
+      <div class="row" style="gap:18px;flex-wrap:wrap"><label class="linkbtn" style="cursor:pointer">${img ? '換照片' : '放自己的照片'}<input type="file" accept="image/*" class="sr" data-a="photo" data-id="${it.id}"></label>${embedUrl(it.url) && (!img || img.gphoto) ? `<button class="linkbtn" data-a="toggleembed" data-id="${it.id}">${it.noEmbed ? '開啟官方預覽' : '預覽壞了?改抓圖片'}</button>` : ''}${img && embedOf(it) ? `<button class="linkbtn" data-a="rmphoto" data-id="${it.id}">改用官方預覽</button>` : ''}</div>
       <div class="row" style="justify-content:space-between"><button class="linkbtn" data-a="edit" data-id="${it.id}">編輯重點與分類</button><button class="linkbtn red" data-a="askdel" data-id="${it.id}">刪除</button></div>`;
   } else if (S.sheet.type === 'cat') {
     inner = `<b style="font-size:17px">選分類</b><p class="note">欄位會跟著換,同名欄位的內容會保留。</p>${CATS.map(c => `<button class="catopt ${S.draft && S.draft.cat === c.id ? 'on' : ''}" data-a="pickcat" data-id="${c.id}"><b>${esc(c.name)}</b><span>${c.fields.map(f => esc(f.name)).join(' · ')}</span></button>`).join('')}`;
@@ -1018,7 +1018,9 @@ async function act(a, ds) {
     case 'menu': S.sheet = { type: 'menu', id: ds.id }; render(); break;
     case 'status': { const it = ITEMS.find(i => i.id === ds.id); const sf = statusField(it); it.values.status = sf.options[(sf.options.indexOf(it.values.status) + 1) % sf.options.length]; await store.putItem(it); render(); toast('已改成' + it.values.status); break; }
     case 'edit': { const it = ITEMS.find(i => i.id === ds.id); S.draft = JSON.parse(JSON.stringify(Object.assign({}, it, { state: 'done' }))); S.draft._loc = it.values.loc || ''; go('confirm'); break; }
-    case 'toggleembed': { const it = ITEMS.find(i => i.id === ds.id); it.noEmbed = !it.noEmbed; await store.putItem(it); S.sheet = null; render(); toast(it.noEmbed ? '已改用文字卡,點卡片開原貼文' : '已開啟官方預覽'); break; }
+    case 'toggleembed': { const it = ITEMS.find(i => i.id === ds.id); it.noEmbed = !it.noEmbed;
+      if (it.noEmbed && !(it.images || []).some(x => x.data || x.url)) { toast('預覽不能用,改抓圖片中…'); const im = await fetchIgCover(it.url); if (im) it.images = [im, ...(it.images || [])]; else toast('抓不到圖片,先用文字卡;可自己放照片'); }
+      await store.putItem(it); S.sheet = null; render(); if (!it.noEmbed) toast('已開啟官方預覽'); break; }
     case 'rmphoto': { const it = ITEMS.find(i => i.id === ds.id); it.images = []; await store.putItem(it); S.sheet = null; render(); toast('已改用官方預覽'); break; }
     case 'askdel': S.sheet = { type: 'del', id: ds.id }; render(); break;
     case 'del': await store.delItem(ds.id); ITEMS = ITEMS.filter(i => i.id !== ds.id); S.sheet = null; if (S.detail === ds.id) { S.detail = null; S.view = 'feed'; } render(); toast('已刪除'); break;
@@ -1210,6 +1212,23 @@ function captionFromHtml(h) {
   const c = h.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments/);
   if (c) return decodeHtml(c[1].replace(/<br\s*\/?>/gi, '\n').replace(/<a[^>]*class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/, '').replace(/<[^>]+>/g, '')).trim();
   return '';
+}
+/* 官方預覽不能內嵌時:改抓貼文封面圖,縮小後存在手機(IG 圖床有防盜連,所以要存成自己的圖) */
+async function fetchIgCover(url) {
+  const ig = igCode(url); if (!ig) return null;
+  const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
+  const viaProxy = (target, kind) => Promise.any(IG_PROXIES.map(mk => { const ctl = new AbortController(); setTimeout(() => ctl.abort(), 8000);
+    return fetch(mk(target), { signal: ctl.signal }).then(r => { if (!r.ok) throw new Error('bad'); return kind === 'blob' ? r.blob() : r.text(); }); }));
+  try {
+    const h = await viaProxy(embed, 'text');
+    let m = h.match(/<img[^>]*class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i) || h.match(/<img[^>]*src="([^"]+)"[^>]*class="[^"]*EmbeddedMediaImage/i)
+      || h.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
+    if (!m) return null;
+    const src = decodeHtml(m[1]);
+    const blob = await viaProxy(src, 'blob');
+    if (!blob || !/^image\//.test(blob.type || 'image/jpeg')) return null;
+    return await shrink(blob, 1000);
+  } catch (e) { return null; }
 }
 function incoming(search) {
   /* 參數可以放在 ? 或 #:圖片很長時要用 #,才不會被伺服器拒絕(URI Too Long) */
