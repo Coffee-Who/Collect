@@ -1218,8 +1218,15 @@ function incoming(search) {
   /* 捷徑順便帶剪貼簿:不是連結就不要;這個連結已經存過(剪貼簿殘留舊連結)也不要 */
   if (pu && !/^https?:\/\//i.test(pu.trim())) pu = '';
   if (pu && pt.trim().length > 20 && ITEMS.some(it => it.url && it.url === normalizeUrl(pu.trim()))) pu = '';
-  const text = cleanShared(stripChrome([p.get('title'), pt].filter(Boolean).join('\n')));
+  const raw = [p.get('title'), pt].filter(Boolean).join('\n');
+  let text = cleanShared(stripChrome(raw));
+  if (!text && raw.trim().length > 20) text = cleanShared(raw); /* 過濾太多就退回原文 */
   const url = pu.trim() || firstUrl(text);
+  const hasImg = (p.get('img') || '').length > 200;
+  if (p.has('text') || p.has('url') || p.has('img')) {
+    S.diag = '收到:文字 ' + raw.length + ' 字、連結 ' + (pu ? '有' : '無') + '、封面 ' + (hasImg ? '有' : '無');
+    if (!url && !text) { setTimeout(() => toast('沒有收到內容(' + S.diag + '),請再試一次'), 500); if (search == null) history.replaceState(null, '', location.pathname); return; }
+  }
   if (!url && !text) return;
   S.autoSave = p.get('auto') === '1';
   if (search == null) history.replaceState(null, '', location.pathname);
