@@ -1288,6 +1288,8 @@ async function runShared() {
   if (cv) await new Promise(r => { const im = new Image(); im.onload = () => { cv.w = im.naturalWidth; cv.h = im.naturalHeight; r(); }; im.onerror = () => { S.add.cover = null; r(); }; im.src = cv.data; });
   await act('analyze', {});
   if (S.autoSave && S.view === 'confirm' && S.draft && !S.draft.url && !(S.draft.note || '').trim()) { S.autoSave = false; toast('沒收到連結也沒收到文字,所以沒有自動存。' + (S.diag ? '(' + S.diag + ')' : '')); return; } /* 不存空白卡 */
+  if (S.autoSave && S.view === 'confirm' && S.draft && !S.draft.url) { /* 沒有連結:不自動存,回到「存一筆」讓使用者貼上連結 */
+    S.autoSave = false; S.draft = null; go('add'); toast('沒收到連結,所以沒自動存。請貼上 IG 連結再存。' + (S.diag ? '(' + S.diag + ')' : '')); return; }
   if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; await act('save', {}); }
 }
 /* 主畫面 App 用:讀剪貼簿(捷徑複製的網址或一般連結) */
