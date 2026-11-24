@@ -432,15 +432,27 @@ async function geoQueue() {
         if (res.photo && SET.gphoto && (!it.images || !it.images.length)) it.images = [res.photo];
       } else it.geo = { miss: true, at: Date.now() };
       await store.putItem(it);
-      if (S.view === 'feed') { const w = $('#wall'); if (w) { w.innerHTML = wallHTML(); fitEmbeds(); } }
+      refreshWall();
       if (!gCanQuery() && gKey()) break;
       await new Promise(r => setTimeout(r, 1200));
     }
   } finally { geoBusy = false; }
 }
+/* 照片存成 data: 長字串,每次重畫都要重新解碼會卡;第一次轉成 blob 網址存起來,之後重畫幾乎不花時間 */
+const BLOBS = new WeakMap();
+function blobUrl(img) {
+  if (!img.data || !/^data:/.test(img.data)) return img.data;
+  let u = BLOBS.get(img); if (u) return u;
+  try { const i = img.data.indexOf(','), mime = (img.data.slice(5, i).match(/^[^;]+/) || ['image/jpeg'])[0], bin = atob(img.data.slice(i + 1)), a = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k);
+    u = URL.createObjectURL(new Blob([a], { type: mime })); BLOBS.set(img, u); return u; } catch (e) { return img.data; }
+}
+/* 背景工作(補封面、查座標)完成時只重畫一次,不要每筆都整頁重畫 */
+let wallTimer = 0;
+function refreshWall() { clearTimeout(wallTimer); wallTimer = setTimeout(() => { if (S.view === 'feed' && !S.sheet) { const w = $('#wall'); if (w) w.innerHTML = wallHTML(); } else if (S.view === 'detail' && !S.sheet) render(); }, 800); }
 function imgSrc(img) {
   if (!img) return '';
-  if (img.data) return img.data; if (img.url) return img.url;
+  if (img.data) return blobUrl(img); if (img.url) return img.url;
   if (img.gphoto && gKey()) return 'https://places.googleapis.com/v1/' + img.gphoto + '/media?maxWidthPx=600&key=' + encodeURIComponent(gKey());
   return '';
 }
@@ -691,7 +703,7 @@ function isIgEmbed(it) { return /instagram\.com/.test(embedOf(it) || ''); }
 function pinRatio(it, big) {
   if (big && isIgEmbed(it) && !coverImg(it)) return it.kind === 'Reel' ? 1.6 : 1.25;
   const img = coverImg(it);
-  if (img) return Math.min(1.6, Math.max(0.7, img.h / img.w));
+  if (img) { const b = Math.min(1.6, Math.max(0.7, img.h / img.w)); return big ? b : Math.min(1.75, Math.max(0.7, b * [0.82, 1, 1.18][vary(it.id, 3)])); } /* 首頁依 id 固定高矮變化,左右兩欄才會錯落;多出的部分裁切 */
   if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [1, 1.15, 1.25][vary(it.id, 3)];
   if (embedOf(it)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
@@ -700,7 +712,7 @@ function visualHTML(it, big) {
   const img = coverImg(it); const c = cat(it.cat); const emb = !img && embedOf(it); const r = pinRatio(it, big);
   const attrs = big ? '' : `data-a="open" data-id="${it.id}" data-lp="${it.id}" role="button" tabindex="0" aria-label="查看 ${esc(titleOf(it))}"`;
   const src = it.platform ? `<span class="src">${esc(it.platform)}</span>` : '';
-  if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
+  if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" decoding="async" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
   if (emb) return `<div class="embed${isIgEmbed(it) ? ' ig' : ''}" ${attrs} style="aspect-ratio:1/${r}"><div class="efall"><span class="s">${esc([it.platform, it.kind].filter(Boolean).join(' '))} · 預覽載入中</span><span class="t">${esc(titleOf(it))}</span></div><iframe src="${esc(emb)}" ${isIgEmbed(it) ? `data-ig="${it.kind === 'Reel' ? 'reel' : 'post'}" data-r="${r}"` : ''} style="height:${isIgEmbed(it) ? 900 : Math.round(340 * r)}px" loading="lazy" title="${esc(it.platform)} 官方預覽" scrolling="no" tabindex="-1"></iframe><span class="cover"></span>${big ? '' : src}</div>`;
   return `<div class="textpin" ${attrs} style="aspect-ratio:1/${r}"><span class="s">${esc([it.platform, c ? c.name : ''].filter(Boolean).join(' · '))}</span><span class="t">${esc(titleOf(it))}</span></div>`;
 }
@@ -1237,7 +1249,7 @@ async function fillCovers() {
     it.coverTried = true; const im = await fetchIgCover(it.url);
     if (im) it.images = [im, ...(it.images || [])];
     await store.putItem(it);
-    if (im && (S.view === 'feed' || S.view === 'detail')) render();
+    if (im) refreshWall();
   }
 }
 function incoming(search) {
