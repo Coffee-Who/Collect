@@ -1236,9 +1236,9 @@ function incoming(search) {
   let pu = p.get('url') || '', pt = p.get('text') || '';
   /* 捷徑裡兩個變數放反也沒關係:哪個是連結就當連結 */
   if (pu && !/^https?:\/\//i.test(pu.trim()) && /^https?:\/\//i.test(pt.trim())) { const t = pu; pu = pt; pt = t; }
-  /* 捷徑順便帶剪貼簿:不是連結就不要;這個連結已經存過(剪貼簿殘留舊連結)也不要 */
+  /* 捷徑順便帶剪貼簿:不是連結就不要;這個連結已經存過(剪貼簿殘留舊連結)也不要;但文字裡沒有別的連結時,這個連結是唯一的,要留著,不然會存成沒連結的空白卡 */
   if (pu && !/^https?:\/\//i.test(pu.trim())) pu = '';
-  if (pu && pt.trim().length > 20 && ITEMS.some(it => it.url && it.url === normalizeUrl(pu.trim()))) pu = '';
+  if (pu && firstUrl(pt) && pt.trim().length > 20 && ITEMS.some(it => it.url && it.url === normalizeUrl(pu.trim()))) pu = '';
   const raw = [p.get('title'), pt].filter(Boolean).join('\n');
   let text = cleanShared(stripChrome(raw));
   if (!text && raw.trim().length > 20) text = cleanShared(raw); /* 過濾太多就退回原文 */
