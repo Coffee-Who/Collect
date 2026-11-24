@@ -981,7 +981,10 @@ async function act(a, ds) {
         catch (err) { toast('文字辨識失敗,先用說明文字判斷'); }
       }
       let cap = ad.caption; let ytAuthor = '';
-      if (!cap.trim() && igCode(ad.url)) { S.busy = '讀取 IG 說明…'; render(); const c = await fetchIgCaption(ad.url); if (c) { cap = cleanShared(c); toast('已讀到 IG 說明'); } }
+      /* 有 IG 連結就先抓貼文原文(比截圖辨識準);抓不到或明顯被截短才用辨識的文字 */
+      if (igCode(ad.url)) { S.busy = '讀取 IG 說明…'; render(); const c = cleanShared(await fetchIgCaption(ad.url) || '');
+        const mine = (cap || '').replace(/\s/g, '').length, got = c.replace(/\s/g, '').length;
+        if (got >= 6 && (!mine || got >= mine * 0.7)) { cap = c; toast('已讀到 IG 原文'); } }
       if (ytId(ad.url)) { S.busy = '讀取 YouTube 標題…'; render(); const info = await ytTitle(ad.url); if (info) { cap = [info.title, cap].filter(Boolean).join('\n'); ytAuthor = info.author; } }
       const imgs = ad.cover ? [ad.cover] : ad.images.length ? ad.images.slice(0, 1) : (ytThumb(ad.url) ? [ytThumb(ad.url)] : []);
       S.busy = ''; S.draft = analyze({ url: ad.url, caption: cap, ocr, images: imgs });
