@@ -700,10 +700,11 @@ function vary(id, n) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.
 /* IG 官方預覽:切掉上方帳號列和下方按讚列,只留影片/照片 */
 const IG_TOP = 62; /* 帳號列高度(預覽框寬 340 時) */
 function isIgEmbed(it) { return /instagram\.com/.test(embedOf(it) || ''); }
+const WALLIX = {};
 function pinRatio(it, big) {
   if (big && isIgEmbed(it) && !coverImg(it)) return it.kind === 'Reel' ? 1.6 : 1.25;
   const img = coverImg(it);
-  if (img) { const b = Math.min(1.6, Math.max(0.7, img.h / img.w)); return big ? b : Math.min(1.75, Math.max(0.7, b * [0.82, 1, 1.18][vary(it.id, 3)])); } /* 首頁依 id 固定高矮變化,左右兩欄才會錯落;多出的部分裁切 */
+  if (img) { const b = img.w && img.h ? Math.min(1.6, Math.max(0.7, img.h / img.w)) : 1; return big ? b : Math.min(1.8, Math.max(0.75, b * [0.78, 1.15, 0.92, 1.32][(WALLIX[it.id] || 0) % 4])); } /* 首頁依排列順序輪流變高矮,左右兩欄才會錯落;多出的部分裁切 */
   if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [1, 1.15, 1.25][vary(it.id, 3)];
   if (embedOf(it)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
@@ -721,6 +722,7 @@ function pinHTML(it) {
   return `<article class="pin">${visualHTML(it)}<div class="pinfoot"><span class="n">${img || emb ? esc(titleOf(it)) : ''}${d != null ? `<small class="dist">${distTxt(d)}</small>` : ''}</span><button class="more" data-a="menu" data-id="${it.id}" aria-label="${esc(titleOf(it))} 的選項">${I.more}</button></div></article>`;
 }
 function wallOf(list) {
+  list.forEach((it, i) => { WALLIX[it.id] = i; });
   const cols = [[], []], h = [0, 0];
   list.forEach(it => { const est = pinRatio(it) * 100 + 16; const k = h[0] <= h[1] ? 0 : 1; cols[k].push(it); h[k] += est; });
   return `<div class="wall">${cols.map(col => `<div class="col">${col.map(pinHTML).join('')}</div>`).join('')}</div>`;
