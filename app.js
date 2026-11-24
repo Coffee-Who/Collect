@@ -624,7 +624,10 @@ async function doImport() {
 const BOOKMARKLET = "javascript:(function(){var m=function(p){var e=document.querySelector('meta[property=\"'+p+'\"],meta[name=\"'+p+'\"]');return e?e.content:''};var t=m('og:description')||m('description');if(!t){var h=document.querySelector('h1');t=h?h.innerText:''}var u=location.href.split('?')[0];location.href='https://coffee-who.github.io/Collect/?auto=1&url='+encodeURIComponent(u)+'&text='+encodeURIComponent(t)})();";
 function mapSettingsHTML() {
   const u = gUsage();
-  return `<span class="label" style="margin-top:8px">地點與地圖</span>
+  return `<span class="label" style="margin-top:8px">IG 轉接服務(選用)</span>
+    <div class="row"><label class="sr" for="pxy">轉接服務網址</label><input id="pxy" class="inp" type="url" placeholder="https://xxx.workers.dev" value="${esc(SET.proxy || '')}" autocomplete="off"><button class="chip" style="height:46px;flex:none" data-a="saveproxy">儲存</button></div>
+    <p class="note">貼上自己部署的 Cloudflare Worker 網址,讀 IG 說明和封面會更穩。不設定也能用。</p>
+    <span class="label" style="margin-top:8px">地點與地圖</span>
     <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><button class="${SET.keyMode !== 'own' ? 'on' : ''}" data-a="keymode" data-id="builtin">使用內建金鑰</button><button class="${SET.keyMode === 'own' ? 'on' : ''}" data-a="keymode" data-id="own">用我自己的金鑰</button></div>
     ${SET.keyMode === 'own' ? `<div class="row"><label class="sr" for="okey">Google API 金鑰</label><input id="okey" class="inp" type="password" placeholder="貼上 Google API 金鑰" value="${esc(SET.ownKey || '')}" autocomplete="off"><button class="chip" style="height:46px;flex:none" data-a="savekey">儲存</button></div>
       <p class="note">金鑰只存在這支手機。要在 Google Cloud 啟用 Maps JavaScript API 和 Places API (New),並設定使用上限。</p>`
@@ -1026,6 +1029,7 @@ async function act(a, ds) {
     case 'near': S.near = !S.near; if (S.near) { await ensurePos(); geoQueue(); } render(); break;
     case 'radius': S.radius = +ds.id; render(); break;
     case 'keymode': SET.keyMode = ds.id; await saveSet(); render(); break;
+    case 'saveproxy': { const el = $('#pxy'); SET.proxy = el ? el.value.trim() : ''; await saveSet(); toast(SET.proxy ? '已設定轉接服務' : '已清除'); break; }
     case 'savekey': { const el = $('#okey'); SET.ownKey = el ? el.value.trim() : ''; await saveSet(); mapsPromise = null; toast(SET.ownKey ? '金鑰已存在這支手機' : '已清除金鑰'); render(); geoQueue(); break; }
     case 'gcap': SET.gcap = +ds.id; await saveSet(); render(); break;
     case 'impgo': doImport(); break;
@@ -1176,8 +1180,17 @@ const IG_PROXIES = [
   u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
   u => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u)
 ];
+/* 自己的轉接服務(Cloudflare Worker,見 worker/ig-proxy.js):比公用轉接穩,有設定就優先用 */
+const IG_PROXY = ''; /* 部署後把 Worker 網址填這裡,或到「設定」貼上 */
+function proxyBase() { return ((SET.proxy || IG_PROXY) || '').trim().replace(/\/+$/, ''); }
+async function proxyMeta(url) {
+  const b = proxyBase(); if (!b) return null;
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 9000);
+  try { const r = await fetch(b + '/meta?url=' + encodeURIComponent(url), { signal: ctl.signal }); if (!r.ok) return null; return await r.json(); } catch (e) { return null; } finally { clearTimeout(tm); }
+}
 async function fetchIgCaption(url) {
   const ig = igCode(url); if (!ig) return '';
+  const pm = await proxyMeta(url); if (pm && pm.description) return pm.description;
   const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
   const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 5000); /* 最多等 5 秒,同時問幾個轉接服務 */
   const one = mk => fetch(mk(embed), { signal: ctl.signal }).then(r => r.ok ? r.text() : '').then(h => {
@@ -1234,6 +1247,8 @@ function captionFromHtml(h) {
 /* 官方預覽不能內嵌時:改抓貼文封面圖,縮小後存在手機(IG 圖床有防盜連,所以要存成自己的圖) */
 async function fetchIgCover(url) {
   const ig = igCode(url); if (!ig) return null;
+  const pm = await proxyMeta(url);
+  if (pm && pm.image) { try { const ctl = new AbortController(); setTimeout(() => ctl.abort(), 12000); const r = await fetch(proxyBase() + '/img?u=' + encodeURIComponent(pm.image), { signal: ctl.signal }); if (r.ok) return await shrink(await r.blob(), 1000); } catch (e) {} }
   const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
   const viaProxy = (target, kind) => Promise.any(IG_PROXIES.map(mk => { const ctl = new AbortController(); setTimeout(() => ctl.abort(), 8000);
     return fetch(mk(target), { signal: ctl.signal }).then(r => { if (!r.ok) throw new Error('bad'); return kind === 'blob' ? r.blob() : r.text(); }); }));
