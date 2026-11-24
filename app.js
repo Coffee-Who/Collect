@@ -1195,6 +1195,7 @@ function stripChrome(t) {
   for (let x of (t || '').split(/\n/)) {
     x = x.trim(); if (!x) continue; const raw = x;
     if (/說讚|都說讚|liked by/i.test(x)) continue;
+    if (/^Instagram\s*[-–—_.]*\s*$/i.test(x)) continue; /* 畫面頂端的 IG 標誌被辨識成字 */
     /* 貼文日期之後是下一篇貼文,後面都不要 */
     if (/^\d{1,2}\s*月\s*\d{1,2}\s*日$|^\d{4}\s*年|^\d+\s*(天|小時|分鐘|週|周)前$|^\d+\s*(days?|hours?|weeks?)\s*ago$/i.test(x)) break;
     /* 表情符號被辨識成怪字:去掉行首的符號、單一字母(📍→Y)、地址前多出的一個字(🏠→血) */
@@ -1250,8 +1251,8 @@ async function fetchIgCover(url) {
 /* 沒有照片的 IG 貼文:背景補抓封面圖,每筆只試一次 */
 async function fillCovers() {
   for (const it of ITEMS.slice()) {
-    if (it.sample || it.coverTried || !igCode(it.url) || (it.images || []).some(x => x.data || x.url)) continue;
-    it.coverTried = true; const im = await fetchIgCover(it.url);
+    if (it.sample || (it.coverTries || 0) >= 3 || !igCode(it.url) || (it.images || []).some(x => x.data || x.url)) continue;
+    it.coverTries = (it.coverTries || 0) + 1; const im = await fetchIgCover(it.url);
     if (im) it.images = [im, ...(it.images || [])];
     await store.putItem(it);
     if (im) refreshWall();
@@ -1288,12 +1289,12 @@ function incoming(search) {
 /* 跑完分享流程:判斷 → 自動存(auto=1 時) */
 async function runShared() {
   const cv = S.add && S.add.cover;
-  if (cv) await new Promise(r => { const im = new Image(); im.onload = () => { cv.w = im.naturalWidth; cv.h = im.naturalHeight; r(); }; im.onerror = () => { S.add.cover = null; r(); }; im.src = cv.data; });
+  if (cv) await new Promise(r => { const im = new Image(); im.onload = () => { cv.w = im.naturalWidth; cv.h = im.naturalHeight; r(); }; im.onerror = () => { S.add.cover = null; S.diag = (S.diag || '') + ',封面圖解碼失敗'; r(); }; im.src = cv.data; });
   await act('analyze', {});
   if (S.autoSave && S.view === 'confirm' && S.draft && !S.draft.url && !(S.draft.note || '').trim()) { S.autoSave = false; toast('沒收到連結也沒收到文字,所以沒有自動存。' + (S.diag ? '(' + S.diag + ')' : '')); return; } /* 不存空白卡 */
   if (S.autoSave && S.view === 'confirm' && S.draft && !S.draft.url) { /* 沒有連結:不自動存,回到「存一筆」讓使用者貼上連結 */
     S.autoSave = false; S.draft = null; go('add'); toast('沒收到連結,所以沒自動存。請貼上 IG 連結再存。' + (S.diag ? '(' + S.diag + ')' : '')); return; }
-  if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; await act('save', {}); }
+  if (S.autoSave && S.view === 'confirm' && S.draft && S.draft.cat) { S.autoSave = false; const noCover = !(S.draft.images && S.draft.images.length); await act('save', {}); if (noCover) { setTimeout(() => toast('這筆沒有封面圖(' + (S.diag || '沒有收到診斷') + '),稍後自動補抓'), 1800); setTimeout(fillCovers, 3000); } }
 }
 /* 主畫面 App 用:讀剪貼簿(捷徑複製的網址或一般連結) */
 async function pasteShared() {
