@@ -154,6 +154,7 @@ function platformOf(u) {
   if (s.includes('youtube.com') || s.includes('youtu.be')) return 'YT';
   return s ? '網頁' : '';
 }
+function embedOf(it) { return it && !it.noEmbed ? embedUrl(it.url) : ''; } /* 預覽壞掉的貼文(it.noEmbed)改顯示文字卡 */
 function embedUrl(u) {
   const s = u || '';
   let m = s.match(/instagram\.com\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
@@ -444,7 +445,7 @@ function imgSrc(img) {
   return '';
 }
 /* 卡片封面:IG/FB/Threads 有官方預覽時,優先用預覽,Google 店家照片只在地圖上用 */
-function coverImg(it) { const im = firstImg(it); return im && im.gphoto && embedUrl(it.url) && SET.igCover !== 'photo' ? null : im; }
+function coverImg(it) { const im = firstImg(it); return im && im.gphoto && embedOf(it) && SET.igCover !== 'photo' ? null : im; }
 function firstImg(it) { const im = it && it.images && it.images.find(x => imgSrc(x)); return im || null; }
 
 /* ---------- 地圖檢視 ---------- */
@@ -686,17 +687,17 @@ function wallHTML() {
 function vary(id, n) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % n; }
 /* IG 官方預覽:切掉上方帳號列和下方按讚列,只留影片/照片 */
 const IG_TOP = 62; /* 帳號列高度(預覽框寬 340 時) */
-function isIgEmbed(it) { return /instagram\.com/.test(embedUrl(it.url) || ''); }
+function isIgEmbed(it) { return /instagram\.com/.test(embedOf(it) || ''); }
 function pinRatio(it, big) {
   if (big && isIgEmbed(it) && !coverImg(it)) return it.kind === 'Reel' ? 1.6 : 1.25;
   const img = coverImg(it);
   if (img) return Math.min(1.6, Math.max(0.7, img.h / img.w));
   if (isIgEmbed(it)) return it.kind === 'Reel' ? [1.3, 1.45, 1.6][vary(it.id, 3)] : [1, 1.15, 1.25][vary(it.id, 3)];
-  if (embedUrl(it.url)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
+  if (embedOf(it)) return it.kind === 'Reel' ? 1.7 : [1.15, 1.3, 1.45][vary(it.id, 3)];
   return [0.8, 1.05, 1.3, 0.95][vary(it.id, 4)];
 }
 function visualHTML(it, big) {
-  const img = coverImg(it); const c = cat(it.cat); const emb = !img && embedUrl(it.url); const r = pinRatio(it, big);
+  const img = coverImg(it); const c = cat(it.cat); const emb = !img && embedOf(it); const r = pinRatio(it, big);
   const attrs = big ? '' : `data-a="open" data-id="${it.id}" data-lp="${it.id}" role="button" tabindex="0" aria-label="查看 ${esc(titleOf(it))}"`;
   const src = it.platform ? `<span class="src">${esc(it.platform)}</span>` : '';
   if (img) return `<div class="pic" ${attrs}><img src="${imgSrc(img)}" alt="" draggable="false" loading="lazy" style="aspect-ratio:1/${r.toFixed(3)};object-fit:cover">${big ? '' : src}</div>`;
@@ -704,7 +705,7 @@ function visualHTML(it, big) {
   return `<div class="textpin" ${attrs} style="aspect-ratio:1/${r}"><span class="s">${esc([it.platform, c ? c.name : ''].filter(Boolean).join(' · '))}</span><span class="t">${esc(titleOf(it))}</span></div>`;
 }
 function pinHTML(it) {
-  const img = coverImg(it); const emb = !img && embedUrl(it.url); const d = S.near ? distOf(it) : null;
+  const img = coverImg(it); const emb = !img && embedOf(it); const d = S.near ? distOf(it) : null;
   return `<article class="pin">${visualHTML(it)}<div class="pinfoot"><span class="n">${img || emb ? esc(titleOf(it)) : ''}${d != null ? `<small class="dist">${distTxt(d)}</small>` : ''}</span><button class="more" data-a="menu" data-id="${it.id}" aria-label="${esc(titleOf(it))} 的選項">${I.more}</button></div></article>`;
 }
 function wallOf(list) {
@@ -724,7 +725,7 @@ function vDetail() {
     <div class="dhero">${visualHTML(it, true)}
       <button class="fbtn l" data-a="back" aria-label="返回">${I.back}</button>
       <button class="fbtn r" data-a="menu" data-id="${it.id}" aria-label="更多選項">${I.more}</button>
-      ${it.url && embedUrl(it.url) && !coverImg(it) ? `<a class="hero-tap" href="${esc(it.url)}" target="_blank" rel="noopener" aria-label="在 ${esc(it.platform || '原貼文')} 播放"></a>` : ''}
+      ${it.url && embedOf(it) && !coverImg(it) ? `<a class="hero-tap" href="${esc(it.url)}" target="_blank" rel="noopener" aria-label="在 ${esc(it.platform || '原貼文')} 播放"></a>` : ''}
       ${it.url ? `<a class="hero-open" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.platform || '原貼文')} ↗</a>` : ''}</div>
     <div class="dbar">
       <div class="row" style="gap:2px">
@@ -854,7 +855,7 @@ function sheetHTML() {
         ${loc || (c && c.fields.some(f => f.type === 'location')) ? `<a class="act" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc || titleOf(it))}" target="_blank" rel="noopener">${I.pin}導航</a>` : '<span></span>'}
         ${sf ? `<button class="act" data-a="status" data-id="${it.id}">${I.check}改成${esc(nextSt)}</button>` : '<span></span>'}
       </div>
-      <div class="row" style="gap:18px;flex-wrap:wrap"><label class="linkbtn" style="cursor:pointer">${img ? '換照片' : '放自己的照片'}<input type="file" accept="image/*" class="sr" data-a="photo" data-id="${it.id}"></label>${img && embedUrl(it.url) ? `<button class="linkbtn" data-a="rmphoto" data-id="${it.id}">改用官方預覽</button>` : ''}</div>
+      <div class="row" style="gap:18px;flex-wrap:wrap"><label class="linkbtn" style="cursor:pointer">${img ? '換照片' : '放自己的照片'}<input type="file" accept="image/*" class="sr" data-a="photo" data-id="${it.id}"></label>${embedUrl(it.url) && !img ? `<button class="linkbtn" data-a="toggleembed" data-id="${it.id}">${it.noEmbed ? '開啟官方預覽' : '預覽壞了?改用文字卡'}</button>` : ''}${img && embedOf(it) ? `<button class="linkbtn" data-a="rmphoto" data-id="${it.id}">改用官方預覽</button>` : ''}</div>
       <div class="row" style="justify-content:space-between"><button class="linkbtn" data-a="edit" data-id="${it.id}">編輯重點與分類</button><button class="linkbtn red" data-a="askdel" data-id="${it.id}">刪除</button></div>`;
   } else if (S.sheet.type === 'cat') {
     inner = `<b style="font-size:17px">選分類</b><p class="note">欄位會跟著換,同名欄位的內容會保留。</p>${CATS.map(c => `<button class="catopt ${S.draft && S.draft.cat === c.id ? 'on' : ''}" data-a="pickcat" data-id="${c.id}"><b>${esc(c.name)}</b><span>${c.fields.map(f => esc(f.name)).join(' · ')}</span></button>`).join('')}`;
@@ -1017,6 +1018,7 @@ async function act(a, ds) {
     case 'menu': S.sheet = { type: 'menu', id: ds.id }; render(); break;
     case 'status': { const it = ITEMS.find(i => i.id === ds.id); const sf = statusField(it); it.values.status = sf.options[(sf.options.indexOf(it.values.status) + 1) % sf.options.length]; await store.putItem(it); render(); toast('已改成' + it.values.status); break; }
     case 'edit': { const it = ITEMS.find(i => i.id === ds.id); S.draft = JSON.parse(JSON.stringify(Object.assign({}, it, { state: 'done' }))); S.draft._loc = it.values.loc || ''; go('confirm'); break; }
+    case 'toggleembed': { const it = ITEMS.find(i => i.id === ds.id); it.noEmbed = !it.noEmbed; await store.putItem(it); S.sheet = null; render(); toast(it.noEmbed ? '已改用文字卡,點卡片開原貼文' : '已開啟官方預覽'); break; }
     case 'rmphoto': { const it = ITEMS.find(i => i.id === ds.id); it.images = []; await store.putItem(it); S.sheet = null; render(); toast('已改用官方預覽'); break; }
     case 'askdel': S.sheet = { type: 'del', id: ds.id }; render(); break;
     case 'del': await store.delItem(ds.id); ITEMS = ITEMS.filter(i => i.id !== ds.id); S.sheet = null; if (S.detail === ds.id) { S.detail = null; S.view = 'feed'; } render(); toast('已刪除'); break;
