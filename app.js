@@ -759,7 +759,7 @@ function vDetail() {
       ${rows ? `<div>${rows}</div>` : ''}
       ${locBlockHTML(it)}
       ${igCode(it.url) && !(it.note || '').trim() ? `<button class="linkbtn" data-a="igread" data-id="${it.id}">讀取 IG 說明並重新分類</button>` : ''}
-      <button class="linkbtn" data-a="edit" data-id="${it.id}">編輯重點與分類</button>
+      <button class="linkbtn pill amber" data-a="edit" data-id="${it.id}">編輯重點與分類</button>
     </div>
     ${more.length ? `<h2 class="dmore">更多${esc(c ? c.name : '')}</h2>${wallOf(more)}` : '<div style="height:60px"></div>'}
   </div>`;
@@ -872,8 +872,8 @@ function sheetHTML() {
         ${loc || (c && c.fields.some(f => f.type === 'location')) ? `<a class="act" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc || titleOf(it))}" target="_blank" rel="noopener">${I.pin}導航</a>` : '<span></span>'}
         ${sf ? `<button class="act" data-a="status" data-id="${it.id}">${I.check}改成${esc(nextSt)}</button>` : '<span></span>'}
       </div>
-      <div class="row" style="gap:18px;flex-wrap:wrap"><label class="linkbtn" style="cursor:pointer">${img ? '換照片' : '放自己的照片'}<input type="file" accept="image/*" class="sr" data-a="photo" data-id="${it.id}"></label>${embedUrl(it.url) && (!img || img.gphoto) ? `<button class="linkbtn" data-a="toggleembed" data-id="${it.id}">${it.noEmbed ? '開啟官方預覽' : '預覽壞了?改抓圖片'}</button>` : ''}${img && embedOf(it) ? `<button class="linkbtn" data-a="rmphoto" data-id="${it.id}">改用官方預覽</button>` : ''}</div>
-      <div class="row" style="justify-content:space-between"><button class="linkbtn" data-a="edit" data-id="${it.id}">編輯重點與分類</button><button class="linkbtn red" data-a="askdel" data-id="${it.id}">刪除</button></div>`;
+      <div class="row" style="gap:10px;flex-wrap:wrap"><label class="linkbtn pill blue" style="cursor:pointer">${img ? '換照片' : '放自己的照片'}<input type="file" accept="image/*" class="sr" data-a="photo" data-id="${it.id}"></label>${embedUrl(it.url) && (!img || img.gphoto) ? `<button class="linkbtn pill gray" data-a="toggleembed" data-id="${it.id}">${it.noEmbed ? '開啟官方預覽' : '預覽壞了?改抓圖片'}</button>` : ''}${img && embedOf(it) ? `<button class="linkbtn pill gray" data-a="rmphoto" data-id="${it.id}">改用官方預覽</button>` : ''}</div>
+      <div class="row" style="justify-content:space-between"><button class="linkbtn" data-a="edit" data-id="${it.id}">編輯重點與分類</button><button class="linkbtn pill red" data-a="askdel" data-id="${it.id}">刪除</button></div>`;
   } else if (S.sheet.type === 'cat') {
     inner = `<b style="font-size:17px">選分類</b><p class="note">欄位會跟著換,同名欄位的內容會保留。</p>${CATS.map(c => `<button class="catopt ${S.draft && S.draft.cat === c.id ? 'on' : ''}" data-a="pickcat" data-id="${c.id}"><b>${esc(c.name)}</b><span>${c.fields.map(f => esc(f.name)).join(' · ')}</span></button>`).join('')}`;
   } else if (S.sheet.type === 'imp') {

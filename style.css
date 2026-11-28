@@ -95,6 +95,11 @@ textarea.inp{min-height:110px;line-height:1.7;resize:vertical}
 .act.pri{background:var(--ink);color:var(--bg)}
 .linkbtn{border:0;background:transparent;color:var(--ink);font-size:15px;padding:10px 0;text-align:left}
 .linkbtn.red{color:var(--danger)}
+.linkbtn.pill{padding:11px 16px;border-radius:12px;font-weight:700;text-align:center}
+.linkbtn.blue{background:rgba(110,168,255,.18);color:#8DB8FF}
+.linkbtn.amber{background:rgba(255,138,101,.18);color:var(--accent)}
+.linkbtn.pill.red{background:rgba(255,138,128,.18)}
+.linkbtn.gray{background:rgba(255,255,255,.09);color:var(--ink)}
 .catopt{text-align:left;border:1px solid var(--line);background:transparent;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
 .catopt.on{border-color:var(--ink)}
 .catopt b{font-size:16px}
