@@ -26,7 +26,8 @@ function meta(html, key) {
   return '';
 }
 const IG_URL = /^https:\/\/(www\.)?instagram\.com\/(p|reel|reels|tv)\/[\w-]+/i;
-const IMG_HOST = /(^|\.)(cdninstagram\.com|fbcdn\.net)$/i;
+const TH_URL = /^https:\/\/(www\.)?threads\.(net|com)\/@[\w.]+\/post\/[\w-]+/i;
+const IMG_HOST = /(^|\.)(cdninstagram\.com|fbcdn\.net|threads\.net|threads\.com)$/i;
 
 export default {
   async fetch(req) {
@@ -34,8 +35,9 @@ export default {
     const u = new URL(req.url);
     if (u.pathname === '/meta') {
       const target = u.searchParams.get('url') || '';
-      if (!IG_URL.test(target)) return json({ error: 'bad url' }, 400);
-      const clean = target.match(IG_URL)[0].replace(/^https:\/\/instagram/i, 'https://www.instagram') + '/';
+      const isTh = TH_URL.test(target);
+      if (!IG_URL.test(target) && !isTh) return json({ error: 'bad url' }, 400);
+      const clean = isTh ? target.match(TH_URL)[0] : target.match(IG_URL)[0].replace(/^https:\/\/instagram/i, 'https://www.instagram') + '/';
       const r = await fetch(clean, { headers: { 'User-Agent': UA, 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' }, redirect: 'follow' });
       const html = await r.text();
       const title = meta(html, 'og:title'), description = meta(html, 'og:description'), image = meta(html, 'og:image');

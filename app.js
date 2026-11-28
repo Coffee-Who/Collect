@@ -985,9 +985,9 @@ async function act(a, ds) {
       }
       let cap = ad.caption; let ytAuthor = '';
       /* 有 IG 連結就先抓貼文原文(比截圖辨識準);抓不到或明顯被截短才用辨識的文字 */
-      if (igCode(ad.url)) { S.busy = '讀取 IG 說明…'; render(); const c = cleanShared(await fetchIgCaption(ad.url) || '');
+      if (igCode(ad.url) || (proxyBase() && /threads\.(net|com)\//.test(ad.url))) { S.busy = '讀取貼文原文…'; render(); const c = cleanShared(await fetchIgCaption(ad.url) || '');
         const mine = (cap || '').replace(/\s/g, '').length, got = c.replace(/\s/g, '').length;
-        if (got >= 6 && (!mine || got >= mine * 0.7)) { cap = c; toast('已讀到 IG 原文'); } }
+        if (got >= 6 && (!mine || got >= mine * 0.7)) { cap = c; toast('已讀到貼文原文'); } }
       if (ytId(ad.url)) { S.busy = '讀取 YouTube 標題…'; render(); const info = await ytTitle(ad.url); if (info) { cap = [info.title, cap].filter(Boolean).join('\n'); ytAuthor = info.author; } }
       const imgs = ad.cover ? [ad.cover] : ad.images.length ? ad.images.slice(0, 1) : (ytThumb(ad.url) ? [ytThumb(ad.url)] : []);
       S.busy = ''; S.draft = analyze({ url: ad.url, caption: cap, ocr, images: imgs });
@@ -1189,8 +1189,8 @@ async function proxyMeta(url) {
   try { const r = await fetch(b + '/meta?url=' + encodeURIComponent(url), { signal: ctl.signal }); if (!r.ok) return null; return await r.json(); } catch (e) { return null; } finally { clearTimeout(tm); }
 }
 async function fetchIgCaption(url) {
-  const ig = igCode(url); if (!ig) return '';
   const pm = await proxyMeta(url); if (pm && pm.description) return pm.description;
+  const ig = igCode(url); if (!ig) return '';
   const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
   const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 5000); /* 最多等 5 秒,同時問幾個轉接服務 */
   const one = mk => fetch(mk(embed), { signal: ctl.signal }).then(r => r.ok ? r.text() : '').then(h => {
@@ -1208,7 +1208,8 @@ function stripChrome(t) {
   for (let x of (t || '').split(/\n/)) {
     x = x.trim(); if (!x) continue; const raw = x;
     if (/說讚|都說讚|liked by/i.test(x)) continue;
-    if (/^Instagram\s*[-–—_.]*\s*$/i.test(x)) continue; /* 畫面頂端的 IG 標誌被辨識成字 */
+    if (/^Instagram\s*[-–—_.]*\s*$/i.test(x)) continue;
+    if (/^[\d.,]+\s*[萬万KkMm]?\s*次瀏覽$|^串文$|^最相關(\s*[>›v˅])?$|^查看動態\s*[>›]?$|^新增回覆[….]*$|^\d+\s*(小時|分鐘|天|週)$|^\d+\s*\/\s*\d+$|^熱門內容$|^贊助內容$/.test(x)) continue; /* Threads 畫面上的瀏覽數、排序、時間等介面字 */ /* 畫面頂端的 IG 標誌被辨識成字 */
     /* 貼文日期之後是下一篇貼文,後面都不要 */
     if (/^\d{1,2}\s*月\s*\d{1,2}\s*日$|^\d{4}\s*年|^\d+\s*(天|小時|分鐘|週|周)前$|^\d+\s*(days?|hours?|weeks?)\s*ago$/i.test(x)) break;
     /* 表情符號被辨識成怪字:去掉行首的符號、單一字母(📍→Y)、地址前多出的一個字(🏠→血) */
@@ -1246,9 +1247,9 @@ function captionFromHtml(h) {
 }
 /* 官方預覽不能內嵌時:改抓貼文封面圖,縮小後存在手機(IG 圖床有防盜連,所以要存成自己的圖) */
 async function fetchIgCover(url) {
-  const ig = igCode(url); if (!ig) return null;
   const pm = await proxyMeta(url);
   if (pm && pm.image) { try { const ctl = new AbortController(); setTimeout(() => ctl.abort(), 12000); const r = await fetch(proxyBase() + '/img?u=' + encodeURIComponent(pm.image), { signal: ctl.signal }); if (r.ok) return await shrink(await r.blob(), 1000); } catch (e) {} }
+  const ig = igCode(url); if (!ig) return null;
   const embed = 'https://www.instagram.com/' + ig.type + '/' + ig.code + '/embed/captioned/';
   const viaProxy = (target, kind) => Promise.any(IG_PROXIES.map(mk => { const ctl = new AbortController(); setTimeout(() => ctl.abort(), 8000);
     return fetch(mk(target), { signal: ctl.signal }).then(r => { if (!r.ok) throw new Error('bad'); return kind === 'blob' ? r.blob() : r.text(); }); }));
@@ -1266,7 +1267,7 @@ async function fetchIgCover(url) {
 /* 沒有照片的 IG 貼文:背景補抓封面圖,每筆只試一次 */
 async function fillCovers() {
   for (const it of ITEMS.slice()) {
-    if (it.sample || (it.coverTries || 0) >= 3 || !igCode(it.url) || (it.images || []).some(x => x.data || x.url)) continue;
+    if (it.sample || (it.coverTries || 0) >= 3 || !(igCode(it.url) || (proxyBase() && /threads\.(net|com)\//.test(it.url))) || (it.images || []).some(x => x.data || x.url)) continue;
     it.coverTries = (it.coverTries || 0) + 1; const im = await fetchIgCover(it.url);
     if (im) it.images = [im, ...(it.images || [])];
     await store.putItem(it);
